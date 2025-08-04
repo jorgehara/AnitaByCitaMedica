@@ -410,6 +410,10 @@ export const goodbyeFlow = addKeyword(['bye', 'adiós', 'chao', 'chau'])
 
 
 
+// Variable para controlar el estado de conexión del bot
+let isConnected = true;
+let qrCode = '';
+
 // Flujo admin para gestionar la sesión
 const adminFlow = addKeyword(['!admin', '!help'])
     .addAction(async (ctx, { flowDynamic, state }) => {
