@@ -5,7 +5,3 @@ node_modules
 *_sessions
 *tokens
 .wwebjs*
-
-*.log
-*qr.png
-*.txt
