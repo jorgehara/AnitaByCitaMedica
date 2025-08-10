@@ -26,7 +26,7 @@ const isConvActive = async (number, ctxFn) => {
     if (convOff[number]) {
         const deactivationDate = new Date(convOff[number]);
         const currentDate = new Date();
-        const hoursDiff = (currentDate - deactivationDate) / (1000 * 60 * 60);
+        const hoursDiff = (currentDate.getTime() - deactivationDate.getTime()) / (1000 * 60 * 60);
 
         // Verificar si la diferencia es mayor a 48 horas
         if (hoursDiff < 48) {
@@ -72,7 +72,7 @@ const conversationsOff = async (ctxFn: any) => {
         if (convOff.hasOwnProperty(number)) {
             const deactivationDate = new Date(convOff[number]);
             const currentDate = new Date();
-            const timeDiff = 48 * 60 * 60 * 1000 - (currentDate - deactivationDate); // Tiempo restante en ms
+            const timeDiff = 48 * 60 * 60 * 1000 - (currentDate.getTime() - deactivationDate.getTime()); // Tiempo restante en ms
             if (timeDiff > 0) {
                 const hours = Math.floor(timeDiff / (1000 * 60 * 60));
                 const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));

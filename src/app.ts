@@ -5,7 +5,7 @@ import { MongoAdapter as Database } from '@builderbot/database-mongo'
 import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
 import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
-import { es } from 'date-fns/locale'
+// import { es } from 'date-fns/lo                const response = await axiosInstance.post('/appointments', appointmentData);
 
 // import welcomeFlow from 'flows/welcome.flow';
 // import { gptFlow } from 'flows/gpt.flow';
@@ -20,9 +20,25 @@ dotenv.config();
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import axios from 'axios'
+import { axiosInstance, retryRequest } from './config/axios';
+import { getFallbackSlots } from './utils/fallbackData';
 
-const API_URL = process.env.API_URL || 'http://localhost:3000'; // Ajusta el valor por defecto si es necesario
+interface APIResponse {
+    success: boolean;
+    data: any;
+    message?: string;
+}
+
+interface APIResponseWrapper {
+    data?: APIResponse;
+    error?: boolean;
+    message?: string;
+}
+import axios from 'axios'
+import { es } from 'date-fns/locale'
+
+const API_URL = process.env.API_URL || 'https://micitamedica.me/api';
+console.log('API URL configurada:', API_URL);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -101,14 +117,12 @@ interface AvailableSlots {
 
 interface APIResponse {
     success: boolean;
-    data: {
-        displayDate: string;
-        available: AvailableSlots;
-    };
+    data: any;
+    message?: string;
 }
 
 interface APIResponseWrapper {
-    data: APIResponse;
+    data?: APIResponse;
 }
 
 function formatearFechaEspanol(fecha: string): string {
@@ -128,40 +142,77 @@ function formatearFechaEspanol(fecha: string): string {
 }
 
 async function fetchAvailableSlots(date: Date): Promise<APIResponseWrapper> {
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    console.log('=== DEBUG FETCH SLOTS ===');
+    console.log('9. Consultando slots disponibles para:', formattedDate);
+    
     try {
-        const formattedDate = format(date, 'yyyy-MM-dd');
-        console.log('9. Consultando slots disponibles para:', formattedDate);
-        const response = await axios.get<APIResponse>(`${API_URL}/appointments/available/${formattedDate}`, {
-            headers: {
-                'Accept': 'application/json'
-            }
+        const result = await retryRequest(async () => {
+            const response = await axiosInstance.get<APIResponse>(`/appointments/available/${formattedDate}`);
+            console.log('Respuesta del servidor:', response.data);
+            return { data: response.data };
         });
-        return { data: response.data };
+
+        if (result.error === 'timeout' || result.error === true) {
+            console.log('Usando sistema de respaldo debido a problemas de conexión');
+            const fallbackData = getFallbackSlots(formattedDate);
+            return { 
+                data: fallbackData,
+                message: 'Estamos experimentando problemas de conexión. Mostrando horarios disponibles del sistema de respaldo.' 
+            };
+        }
+
+        return result;
     } catch (error) {
+        console.error('=== DEBUG ERROR ===');
         console.error('Error al obtener slots disponibles:', error);
-        throw error;
+        if (axios.isAxiosError(error)) {
+            console.error('Detalles del error:', {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data,
+                url: error.config?.url
+            });
+        }
+        
+        console.log('Usando sistema de respaldo debido a error en la petición');
+        const fallbackData = getFallbackSlots(formattedDate);
+        return { 
+            data: fallbackData,
+            message: 'Estamos experimentando problemas técnicos. Mostrando horarios disponibles del sistema de respaldo.'
+        };
     }
 }
 
 // Primero, añadimos una función para obtener las citas reservadas
 async function getReservedAppointments(date: string): Promise<string[]> {
-    try {
-        const response = await axios.get(`${API_URL}/appointments/reserved/${date}`);
-        if (response.data.success) {
-            return response.data.data.map(appointment => appointment.time);
+    return retryRequest(async () => {
+        try {
+            const response = await axiosInstance.get(`/appointments/reserved/${date}`);
+            if (response.data.success) {
+                return response.data.data.map(appointment => appointment.time);
+            }
+            return [];
+        } catch (error) {
+            console.error('Error al obtener citas reservadas:', error);
+            return [];
         }
-        return [];
-    } catch (error) {
-        console.error('Error al obtener citas reservadas:', error);
-        return [];
-    }
+    });
 }
 
 // Flujo para mostrar los horarios disponibles
-export const availableSlotsFlow = addKeyword(['1', 'horarios', 'disponibles', 'turnos'])
+export const availableSlotsFlow = addKeyword(['1', 'horarios', 'disponibles', 'turnos', 'horario'])
+    .addAction(async (ctx) => {
+        console.log('=== DEPURACIÓN DE ENTRADA ===');
+        console.log('Mensaje recibido:', ctx.body);
+        console.log('Tipo de mensaje:', typeof ctx.body);
+    })
 .addAction(async (ctx, { flowDynamic, state }) => {
     try {
+        console.log('=== DEBUG SLOTS FLOW ===');
         console.log('1. Iniciando flujo de horarios disponibles');
+        console.log('Mensaje recibido:', ctx.body);
+        console.log('API URL:', API_URL);
         const timeZone = 'America/Argentina/Buenos_Aires';
         
         const now = new Date();
@@ -460,7 +511,13 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
     );
 
 const main = async () => {
-    const adapterFlow = createFlow([welcomeFlow, welcomeFlow, adminFlow])
+    const adapterFlow = createFlow([
+        welcomeFlow,
+        availableSlotsFlow,
+        bookAppointmentFlow,
+        goodbyeFlow,
+        adminFlow
+    ])
     
     const adapterProvider = createProvider(Provider)
         const adapterDB = new Database({
