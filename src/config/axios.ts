@@ -4,41 +4,51 @@ const API_URL = process.env.API_URL || 'https://micitamedica.me/api';
 // Configuración global de axios
 const axiosInstance = axios.create({
     baseURL: API_URL,
-    timeout: 30000, // 30 segundos de timeout
+    timeout: 10000, // 10 segundos de timeout inicial
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+    },
+    maxRedirects: 5,
+    validateStatus: function (status) {
+        return status >= 200 && status < 500; // No rechazar respuestas con estado < 500
     }
 });
 
 // Función de reintento
 async function retryRequest(fn: () => Promise<any>, maxRetries = 3): Promise<any> {
     let lastError;
+    let timeoutMs = 10000; // Empezar con 10 segundos
+
     for (let i = 0; i < maxRetries; i++) {
         try {
+            // Ajustar el timeout de la instancia actual
+            axiosInstance.defaults.timeout = timeoutMs;
             return await fn();
         } catch (error: any) {
             lastError = error;
             console.log(`Intento ${i + 1} fallido. Motivo: ${error.code || error.message}`);
             
-            // Si es un error de timeout o de conexión, esperar más tiempo
             if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-                const waitTime = 5000 * Math.pow(2, i); // Empezar con 5s, luego 10s, 20s
+                timeoutMs *= 2; // Duplicar el timeout en cada intento
+                const waitTime = 3000 * (i + 1); // 3s, 6s, 9s de espera
                 console.log(`Esperando ${waitTime/1000} segundos antes del siguiente intento...`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
             } else if (i < maxRetries - 1) {
-                const waitTime = 1000 * Math.pow(2, i);
+                const waitTime = 1000 * (i + 1);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
             }
         }
     }
     
+    // Si todos los intentos fallan, devolver el sistema de respaldo
     if (lastError?.code === 'ECONNABORTED' || lastError?.code === 'ETIMEDOUT') {
         console.error('Error de conexión: El servidor está tardando en responder');
-        return { error: 'timeout', message: 'El servidor está tardando en responder. Por favor, inténtalo de nuevo más tarde.' };
+        return { error: true, message: 'timeout', data: null };
     }
     
     throw lastError;
 }
+    
 
 export { axiosInstance, retryRequest };

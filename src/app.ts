@@ -1,4 +1,3 @@
-
 import { join } from 'path'
 import { createBot, createProvider, createFlow, addKeyword, utils, EVENTS } from '@builderbot/bot'
 import { MongoAdapter as Database } from '@builderbot/database-mongo'
@@ -184,21 +183,110 @@ async function fetchAvailableSlots(date: Date): Promise<APIResponseWrapper> {
     }
 }
 
-// Primero, añadimos una función para obtener las citas reservadas
+import appointmentService from './utils/appointmentService';
+
+
+
+// Función para obtener las citas reservadas usando el nuevo servicio
 async function getReservedAppointments(date: string): Promise<string[]> {
-    return retryRequest(async () => {
-        try {
-            const response = await axiosInstance.get(`/appointments/reserved/${date}`);
-            if (response.data.success) {
-                return response.data.data.map(appointment => appointment.time);
-            }
-            return [];
-        } catch (error) {
-            console.error('Error al obtener citas reservadas:', error);
-            return [];
-        }
-    });
+    return appointmentService.getReservedSlots(date);
 }
+
+//Flujo de sobreturnos
+export const bookSobreturnoFlow = addKeyword(['3', 'sobreturno', 'sobre turno', 'sobreturnos'])
+    .addAnswer(
+        'Has seleccionado la opción de *Sobre Turno*. Por favor, indícame tu *NOMBRE* y *APELLIDO* (ej: Juan Pérez):',
+        { capture: true }
+    )
+    .addAction(async (ctx, { state }) => {
+        const name = ctx.body.trim();
+        await state.update({ clientName: name });
+    })
+    .addAnswer(
+        '*Por favor*, selecciona tu *OBRA SOCIAL* de la siguiente lista:\n\n' +
+        '1️⃣ INSSSEP\n' +
+        '2️⃣ Swiss Medical\n' +
+        '3️⃣ OSDE\n' +
+        '4️⃣ Galeno\n' +
+        '5️⃣ CONSULTA PARTICULAR',
+        { capture: true }
+    )
+    .addAction(async (ctx, { state }) => {
+        const socialWorkOption = ctx.body.trim();
+        const socialWorks = {
+            '1': 'INSSSEP',
+            '2': 'Swiss Medical',
+            '3': 'OSDE',
+            '4': 'Galeno',
+            '5': 'CONSULTA PARTICULAR',
+            '6': 'CONSULTA PARTICULAR',
+            '7': 'CONSULTA PARTICULAR',
+            '8': 'CONSULTA PARTICULAR',
+            '9': 'CONSULTA PARTICULAR',
+        };
+        const socialWork = socialWorks[socialWorkOption] || 'CONSULTA PARTICULAR';
+        await state.update({ socialWork });
+    })
+    .addAnswer(
+        '*Vamos a proceder con la solicitud de tu sobre turno.*',
+        { delay: 1000 }
+    )
+    .addAction(async (ctx, { flowDynamic, state }) => {
+        try {
+            const clientName = state.get('clientName');
+            const socialWork = state.get('socialWork');
+            const selectedSlot = state.get('selectedSlot');
+            const appointmentDate = state.get('appointmentDate');
+            const phone = ctx.from;
+
+            const sobreturnoData = {
+                clientName,
+                socialWork,
+                phone: phone,
+                date: appointmentDate,
+                time: selectedSlot.displayTime,
+                email: phone + '@phone.com',
+                description: 'Solicitud de sobreturno',
+                status: 'pending'
+            };
+
+            try {
+                const response = await axios.post(`${API_URL}/sobreturnos`, sobreturnoData, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = response.data;
+
+                if (data && (data.success || data._id)) {
+                    const fechaFormateada = formatearFechaEspanol(sobreturnoData.date);
+                    const message = `✨ *SOLICITUD DE SOBRE TURNO* ✨\n\n` +
+                        `✅ El sobre turno fue registrado y está *pendiente de confirmación*\n\n` +
+                        `📅 *Fecha:* ${fechaFormateada}\n` +
+                        `🕒 *Hora:* ${sobreturnoData.time}\n` +
+                        `👤 *Paciente:* ${sobreturnoData.clientName}\n` +
+                        `📞 *Teléfono:* ${sobreturnoData.phone}\n` +
+                        `🏥 *Obra Social:* ${sobreturnoData.socialWork}\n\n` +
+                        `ℹ️ *Recibirás una confirmación cuando el sobre turno sea aceptado.*\n\n` +
+                        `*¡Gracias por confiar en nosotros!* 🙏\n` +
+                        `----------------------------------`;
+                    await flowDynamic(message);
+                } else {
+                    await flowDynamic('Lo siento, hubo un problema al crear el sobre turno. Por favor, intenta nuevamente.');
+                }
+            } catch (error) {
+                console.error('Error al crear el sobre turno:', error);
+                await flowDynamic('Lo siento, ocurrió un error al crear el sobre turno. Por favor, intenta nuevamente más tarde.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            await flowDynamic('❌ Hubo un error al solicitar el sobre turno. Por favor, intenta nuevamente.');
+        }
+    })
+    .addAction(async (ctx, ctxFn) => {
+        await ctxFn.gotoFlow(goodbyeFlow);
+    });
 
 // Flujo para mostrar los horarios disponibles
 export const availableSlotsFlow = addKeyword(['1', 'horarios', 'disponibles', 'turnos', 'horario'])
@@ -516,7 +604,8 @@ const main = async () => {
         availableSlotsFlow,
         bookAppointmentFlow,
         goodbyeFlow,
-        adminFlow
+        adminFlow,
+        bookSobreturnoFlow,
     ])
     
     const adapterProvider = createProvider(Provider)

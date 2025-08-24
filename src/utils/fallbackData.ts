@@ -9,15 +9,20 @@ export const defaultAvailableSlots = {
 };
 
 export const getFallbackSlots = (date: string) => {
+    const slots = [];
+    
+    // Convertir los horarios por defecto al formato esperado
+    [...defaultAvailableSlots.morning, ...defaultAvailableSlots.afternoon].forEach(time => {
+        slots.push({
+            displayTime: time,
+            time: time,
+            status: 'available'
+        });
+    });
+
     return {
         success: true,
-        data: {
-            displayDate: date,
-            available: {
-                morning: [...defaultAvailableSlots.morning],
-                afternoon: [...defaultAvailableSlots.afternoon]
-            }
-        },
+        data: slots,
         message: "Datos recuperados del sistema de respaldo"
     };
 };
