@@ -285,6 +285,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturno', 'sobre turno', 'sobr
         { capture: true },
         async (ctx, { gotoFlow, flowDynamic, state }) => {
             if (ctx.body.toLowerCase() === 'cancelar') {
+                await state.clear(); // Limpiar estado
                 await flowDynamic(`❌ *Solicitud cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!`);
                 return gotoFlow(goodbyeFlow);
             }
@@ -349,12 +350,57 @@ export const bookSobreturnoFlow = addKeyword(['sobreturno', 'sobre turno', 'sobr
                 await flowDynamic('❌ Lo siento, ocurrió un error al crear el sobre turno. Por favor, intenta nuevamente más tarde.');
             }
             
+            // Limpiar estado antes de ir a goodbyeFlow
+            await state.clear();
             return gotoFlow(goodbyeFlow);
         }
     );
 
-// Flujo para mostrar los horarios disponibles
-export const availableSlotsFlow = addKeyword(['1', 'horarios', 'disponibles', 'turnos', 'horario'])
+// Flujo de opciones del menú principal
+const option1Flow = addKeyword(['1'])
+    .addAction(async (ctx, { state, gotoFlow }) => {
+        // Verificar si estamos en un flujo activo (sobreturnos o citas normales)
+        const availableSlots = state.get('availableSlots');
+        const clientName = state.get('clientName');
+        const socialWork = state.get('socialWork');
+        const appointmentDate = state.get('appointmentDate');
+        
+        // Si hay cualquier dato de flujo activo, no interferir
+        if (availableSlots || clientName || socialWork || appointmentDate) {
+            console.log('=== OPCIÓN 1 IGNORADA - FLUJO ACTIVO ===');
+            console.log('Estado actual:', { availableSlots: !!availableSlots, clientName: !!clientName, socialWork: !!socialWork, appointmentDate: !!appointmentDate });
+            return; // No hacer nada, dejar que el capture del flujo activo lo maneje
+        }
+        
+        // Limpiar estado y dirigir al flujo de horarios
+        await state.clear();
+        console.log('=== ACTIVANDO FLUJO DE HORARIOS NORMALES ===');
+        return gotoFlow(availableSlotsFlow);
+    });
+
+const option2Flow = addKeyword(['2'])
+    .addAction(async (ctx, { state, gotoFlow }) => {
+        // Verificar si estamos en un flujo activo (sobreturnos o citas normales)
+        const availableSlots = state.get('availableSlots');
+        const clientName = state.get('clientName');
+        const socialWork = state.get('socialWork');
+        const appointmentDate = state.get('appointmentDate');
+        
+        // Si hay cualquier dato de flujo activo, no interferir
+        if (availableSlots || clientName || socialWork || appointmentDate) {
+            console.log('=== OPCIÓN 2 IGNORADA - FLUJO ACTIVO ===');
+            console.log('Estado actual:', { availableSlots: !!availableSlots, clientName: !!clientName, socialWork: !!socialWork, appointmentDate: !!appointmentDate });
+            return; // No hacer nada, dejar que el capture del flujo activo lo maneje
+        }
+        
+        // Limpiar estado y dirigir al flujo de sobreturnos
+        await state.clear();
+        console.log('=== ACTIVANDO FLUJO DE SOBRETURNOS ===');
+        return gotoFlow(bookSobreturnoFlow);
+    });
+
+// Flujo para mostrar los horarios disponibles (citas normales)
+export const availableSlotsFlow = addKeyword(['horarios', 'disponibles', 'turnos', 'horario'])
     .addAction(async (ctx) => {
         console.log('=== DEPURACIÓN DE ENTRADA ===');
         console.log('Mensaje recibido:', ctx.body);
@@ -500,12 +546,16 @@ export const availableSlotsFlow = addKeyword(['1', 'horarios', 'disponibles', 't
         const selectedSlot = availableSlots[selectedSlotNumber - 1];
         await state.update({ selectedSlot: selectedSlot });
         
-        // Dirigir al flujo de reserva de citas
-        return gotoFlow(bookAppointmentFlow);
+        console.log('=== DEBUG ESTADO ANTES DE DIRIGIR A BOOK APPOINTMENT ===');
+        console.log('selectedSlot guardado:', selectedSlot);
+        console.log('appointmentDate:', state.get('appointmentDate'));
+        
+        // Dirigir al flujo de recopilación de datos del cliente
+        return gotoFlow(clientDataFlow);
     });
 
-// Flujo para agendar una cita médica
-export const bookAppointmentFlow = addKeyword(['2', 'reservar', 'cita', 'agendar', 'turno'])
+// Flujo para recopilar datos del cliente y crear la cita normal
+export const clientDataFlow = addKeyword(['datos_cliente'])
     .addAnswer(
         'Por favor, indícame tu *NOMBRE* y *APELLIDO* (ej: Juan Pérez):',
         { capture: true }
@@ -539,13 +589,31 @@ export const bookAppointmentFlow = addKeyword(['2', 'reservar', 'cita', 'agendar
     .addAnswer(
         '*Vamos a proceder con la reserva de tu cita.*'
     )
-    .addAction(async (ctx, { flowDynamic, state }) => {
+    .addAction(async (ctx, { flowDynamic, state, gotoFlow }) => {
         try {
             const clientName = state.get('clientName');
             const socialWork = state.get('socialWork');
             const selectedSlot = state.get('selectedSlot');
             const appointmentDate = state.get('appointmentDate');
             const phone = ctx.from;
+
+            // Validar que todos los datos requeridos están presentes
+            if (!clientName || !socialWork || !selectedSlot || !appointmentDate) {
+                console.error('Datos faltantes en el estado:', {
+                    clientName,
+                    socialWork,
+                    selectedSlot,
+                    appointmentDate
+                });
+                await flowDynamic('❌ Hubo un problema con los datos de la cita. Por favor, intenta nuevamente desde el inicio.');
+                return;
+            }
+
+            if (!selectedSlot.displayTime) {
+                console.error('selectedSlot no tiene displayTime:', selectedSlot);
+                await flowDynamic('❌ Hubo un problema con el horario seleccionado. Por favor, intenta nuevamente.');
+                return;
+            }
 
             const appointmentData: AppointmentData = {
                 clientName,
@@ -556,68 +624,52 @@ export const bookAppointmentFlow = addKeyword(['2', 'reservar', 'cita', 'agendar
                 email: phone + '@phone.com'
             };
 
-            try {
-                const result = await createAppointment(appointmentData);
+            const result = await createAppointment(appointmentData);
 
-                if (result.error) {
-                    await flowDynamic(`❌ ${result.message || 'Hubo un problema al crear la cita. Por favor, intenta nuevamente.'}`);
-                    return;
-                }
+            if (result.error) {
+                await flowDynamic(`❌ ${result.message || 'Hubo un problema al crear la cita. Por favor, intenta nuevamente.'}`);
+                return;
+            }
 
-                const data = result.data;
-                if (data && data.success) {
-                    const fechaFormateada = formatearFechaEspanol(data.data.date);
-                    const message = `✨ *CONFIRMACIÓN DE CITA MÉDICA* ✨\n\n` +
-                        `✅ La cita ha sido agendada exitosamente\n\n` +
-                        `📅 *Fecha:* ${fechaFormateada}\n` +
-                        `🕒 *Hora:* ${data.data.time}\n` +
-                        `👤 *Paciente:* ${data.data.clientName}\n` +
-                        `📞 *Teléfono:* ${data.data.phone}\n` +
-                        `🏥 *Obra Social:* ${data.data.socialWork}\n\n` +
-                        `ℹ️ *Información importante:*\n` +
-                        `- Por favor, llegue 10 minutos antes de su cita\n` +
-                        `- Traiga su documento de identidad\n` +
-                        `- Traiga su carnet de obra social\n\n` +
-                        `📌 *Para cambios o cancelaciones:*\n` +
-                        `Por favor contáctenos con anticipación\n\n` +
-                        `*¡Gracias por confiar en nosotros!* 🙏\n` +
-                        `----------------------------------`;
-                    await flowDynamic(message);
-                } else {
-                    await flowDynamic('❌ Lo siento, hubo un problema al crear la cita. Por favor, intenta nuevamente.');
-                }
-            } catch (error) {
-                console.error('Error al crear la cita:', error);
-                await flowDynamic('❌ Lo siento, ocurrió un error al crear la cita. Por favor, intenta nuevamente más tarde.');
+            const data = result.data;
+            if (data && data.success) {
+                const fechaFormateada = formatearFechaEspanol(data.data.date);
+                const message = `✨ *CONFIRMACIÓN DE CITA MÉDICA* ✨\n\n` +
+                    `✅ La cita ha sido agendada exitosamente\n\n` +
+                    `📅 *Fecha:* ${fechaFormateada}\n` +
+                    `🕒 *Hora:* ${data.data.time}\n` +
+                    `👤 *Paciente:* ${data.data.clientName}\n` +
+                    `📞 *Teléfono:* ${data.data.phone}\n` +
+                    `🏥 *Obra Social:* ${data.data.socialWork}\n\n` +
+                    `ℹ️ *Información importante:*\n` +
+                    `- Por favor, llegue 10 minutos antes de su cita\n` +
+                    `- Traiga su documento de identidad\n` +
+                    `- Traiga su carnet de obra social\n\n` +
+                    `📌 *Para cambios o cancelaciones:*\n` +
+                    `Por favor contáctenos con anticipación\n\n` +
+                    `*¡Gracias por confiar en nosotros!* 🙏\n` +
+                    `----------------------------------`;
+                await flowDynamic(message);
+            } else {
+                await flowDynamic('❌ Lo siento, hubo un problema al crear la cita. Por favor, intenta nuevamente.');
             }
         } catch (error) {
-            console.error('Error:', error);
-            await flowDynamic('❌ Hubo un error al agendar la cita. Por favor, intenta nuevamente.');
+            console.error('Error al crear la cita:', error);
+            await flowDynamic('❌ Lo siento, ocurrió un error al crear la cita. Por favor, intenta nuevamente más tarde.');
         }
-    })
-    .addAction(async (ctx, ctxFn) => {
-        await ctxFn.gotoFlow(goodbyeFlow);
+        
+        // Limpiar estado y dirigir a goodbyeFlow
+        await state.clear();
+        return gotoFlow(goodbyeFlow);
     });
-//                 console.error('Error al crear la cita:', error);
-//                 await flowDynamic('Lo siento, ocurrió un error al crear la cita. Por favor, intenta nuevamente más tarde.');
-//             }
-//         } catch (error) {
-//             console.error('Error:', error);
-//             await flowDynamic('❌ Hubo un error al agendar la cita. Por favor, intenta nuevamente.');
-//         }
-//     })
-//     .addAction(async (ctx, ctxFn) => {
-//         await ctxFn.gotoFlow(goodbyeFlow);
-//     });
+
+// Flujo para agendar una cita médica
 //Flujo de despedida
 export const goodbyeFlow = addKeyword(['bye', 'adiós', 'chao', 'chau'])
     .addAnswer(
         `👋 *¡Hasta luego! Si necesitas más ayuda, no dudes en contactarnos nuevamente.*`,
         { delay: 1000 }
-    )
-    // .addAction(async (ctx, ctxFn) => {
-    //     await ctxFn.gotoFlow(welcomeFlow);
-    // });
+    );
 
 
 
@@ -673,8 +725,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             'Puedo ayudarte con las siguientes opciones:',
             '',
             '1️⃣ *horarios* - Ver horarios disponibles',
-            '2️⃣ *cita* - Agendar una cita médica',
-            '3️⃣ *sobreturno* - Solicitar un sobre turno',
+            '2️⃣ *sobreturno* - Solicitar un sobre turno',
             '',
             '💡 *Todas las citas se confirman automáticamente*',
             '',
@@ -684,9 +735,13 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
 const main = async () => {
     const adapterFlow = createFlow([
+        // Flujos de opciones del menú (deben ir primero)
+        option1Flow,
+        option2Flow,
+        // Flujos principales
         welcomeFlow,
         availableSlotsFlow,
-        bookAppointmentFlow,
+        clientDataFlow,
         goodbyeFlow,
         adminFlow,
         bookSobreturnoFlow,
