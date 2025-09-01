@@ -1,5 +1,7 @@
 import axios from 'axios';
-const API_URL = process.env.API_URL || 'https://micitamedica.me/api';
+import { APP_CONFIG } from './app';
+
+const API_URL = APP_CONFIG.API_URL;
 
 // Configuración global de axios
 const axiosInstance = axios.create({

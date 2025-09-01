@@ -90,6 +90,33 @@ class AppointmentService {
             return [];
         }
     }
+
+    async createAppointment(appointmentData: any): Promise<any> {
+        try {
+            console.log('=== CREANDO CITA ===');
+            console.log('Datos de la cita:', appointmentData);
+            
+            const response = await axiosInstance.post('/appointments', appointmentData);
+            console.log('Respuesta del backend:', response.data);
+            
+            return { data: response.data };
+        } catch (error: any) {
+            console.error('Error al crear la cita:', error);
+            
+            if (error.response) {
+                console.error('Error response:', error.response.data);
+                return { 
+                    error: true, 
+                    message: error.response.data.message || 'Error al crear la cita' 
+                };
+            }
+            
+            return { 
+                error: true, 
+                message: 'Error de conexión al crear la cita' 
+            };
+        }
+    }
 }
 
 export default AppointmentService.getInstance();
