@@ -189,7 +189,7 @@ async function createAppointment(appointmentData: AppointmentData): Promise<APIR
 }
 
 //Flujo de sobreturnos - SOLO se activa con la palabra "sobreturno"
-export const bookSobreturnoFlow = addKeyword(['sobreturno'])
+export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
     .addAnswer(
         '🏥 *SOLICITUD DE SOBRETURNO*\n\n' +
         'Has solicitado un *sobreturno*. Para continuar, necesito algunos datos.\n\n' +
@@ -447,7 +447,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturno'])
     );
 
 // Flujo para mostrar los horarios disponibles (citas normales)
-export const availableSlotsFlow = addKeyword(['horarios', 'disponibles', 'turnos', 'horario'])
+export const availableSlotsFlow = addKeyword(['turnos'])
     .addAction(async (ctx) => {
         console.log('=== DEPURACIÓN DE ENTRADA ===');
         console.log('Mensaje recibido:', ctx.body);
@@ -771,8 +771,8 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
         await flowDynamic([
             'Puedo ayudarte con las siguientes opciones:',
             '',
-            '📅 Escribe *"horarios"* - Ver horarios disponibles para citas normales',
-            '🏥 Escribe *"sobreturno"* - Solicitar un sobreturno urgente',
+            '📅 Escribe *"turnos"* - Ver horarios disponibles para citas normales',
+            '🏥 Escribe *"sobreturnos"* - Solicitar un sobreturno urgente',
             '',
             '💡 *Información importante:*',
             '• Las citas normales se programan con anticipación',
