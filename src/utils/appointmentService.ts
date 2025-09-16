@@ -93,27 +93,45 @@ class AppointmentService {
 
     async createAppointment(appointmentData: any): Promise<any> {
         try {
-            console.log('=== CREANDO CITA ===');
-            console.log('Datos de la cita:', appointmentData);
-            
-            const response = await axiosInstance.post('/appointments', appointmentData);
+            // Cargar por defecto los parámetros obligatorios si no están presentes
+            const defaultData = {
+                isSobreturno: false,
+                status: 'pending',
+                socialWork: 'CONSULTA PARTICULAR',
+                attended: false,
+            };
+            // Si falta algún campo obligatorio, lo agregamos
+            const finalData = {
+                ...defaultData,
+                ...appointmentData,
+            };
+            // Validar campos mínimos
+            if (!finalData.clientName) finalData.clientName = 'Sin nombre';
+            if (!finalData.phone) finalData.phone = '';
+            if (!finalData.date) finalData.date = new Date().toISOString().split('T')[0];
+            if (!finalData.time) finalData.time = '10:00';
+
+            console.log('=== CREANDO CITA (ESTANDARIZADA) ===');
+            console.log('Datos de la cita:', finalData);
+
+            const response = await axiosInstance.post('/appointments', finalData);
             console.log('Respuesta del backend:', response.data);
-            
+
             return { data: response.data };
         } catch (error: any) {
             console.error('Error al crear la cita:', error);
-            
+
             if (error.response) {
                 console.error('Error response:', error.response.data);
-                return { 
-                    error: true, 
-                    message: error.response.data.message || 'Error al crear la cita' 
+                return {
+                    error: true,
+                    message: error.response.data.message || 'Error al crear la cita'
                 };
             }
-            
-            return { 
-                error: true, 
-                message: 'Error de conexión al crear la cita' 
+
+            return {
+                error: true,
+                message: 'Error de conexión al crear la cita'
             };
         }
     }

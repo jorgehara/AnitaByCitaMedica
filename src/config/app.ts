@@ -3,7 +3,7 @@ config();
 
 export const APP_CONFIG = {
     // Configuración de la API
-    API_URL: process.env.API_URL || 'http://localhost:3001/api',
+    API_URL: process.env.API_URL || 'https://micitamedica.me/api',
     PORT: process.env.PORT || 3008,
     
     // Configuración de MongoDB
