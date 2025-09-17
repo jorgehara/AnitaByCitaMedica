@@ -335,19 +335,54 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                 // Mostrar confirmación antes de crear
                 await flowDynamic(`⏳ *Procesando tu sobreturno...*\n\n📝 *Resumen:*\n👤 ${clientName}\n🏥 ${socialWork}\n🔢 Sobreturno ${numero}`);
 
-                // Crear el sobreturno
+
+                // Asignar horario fijo según el número de sobreturno
+                const sobreturnoHorarios = [
+                    '11:00', '11:15', '11:30', '11:45', '12:00',
+                    '19:00', '19:15', '19:30', '19:45', '20:00'
+                ];
+                const horarioAsignado = sobreturnoHorarios[numero - 1];
+
+                // Crear el sobreturno con horario fijo
                 const sobreturnoData = {
                     clientName,
                     socialWork,
                     phone: phone,
                     date: appointmentDate,
                     sobreturnoNumber: numero,
+                    time: horarioAsignado,
                     email: phone + '@phone.com'
                 };
 
-                // Aquí deberías enviar sobreturnoData al backend si lo necesitas
-                // Ejemplo:
-                // const result = await axios.post(`${API_URL}/sobreturnos`, sobreturnoData, { ... });
+                // Enviar sobreturnoData al backend
+                try {
+                    const result = await axios.post(`${API_URL}/sobreturnos`, sobreturnoData);
+                    if (result.data && result.data._id) {
+                        // Confirmación exitosa
+                        const confirmationMessage = `✨ *CONFIRMACIÓN DE SOBRETURNO* ✨\n\n` +
+                            `✅ *¡Tu sobreturno ha sido agendado exitosamente!*\n\n` +
+                            `📅 *Fecha:* ${formatearFechaEspanol(appointmentDate)}\n` +
+                            `🔢 *Sobreturno:* ${numero}\n` +
+                            // `🕒 *Horario:* ${horarioAsignado}\n`+
+                            `👤 *Paciente:* ${clientName}\n` +
+                            `📞 *Teléfono:* ${phone}\n` +
+                            `🏥 *Obra Social:* ${socialWork}\n\n` +
+                            `⚠️ *IMPORTANTE:*\n` +
+                            `• Llegue 10 minutos antes\n` +
+                            `• Traiga documento de identidad\n` +
+                            `• Traiga carnet de obra social\n` +
+                            `• El sobreturno depende de la disponibilidad del médico\n\n` +
+                            `*¡Gracias por confiar en nosotros!* 🙏`;
+                        await flowDynamic(confirmationMessage);
+                    } else {
+                        await flowDynamic('❌ Ocurrió un error al agendar el sobreturno. Por favor, intenta nuevamente.');
+                    }
+                } catch (error) {
+                    console.error('[SOBRETURNO] Error al enviar al backend:', error);
+                    await flowDynamic('❌ Ocurrió un error inesperado al agendar el sobreturno. Por favor, intenta nuevamente más tarde.');
+                }
+                await state.clear();
+                return gotoFlow(goodbyeFlow);
 
                 // Simulación de confirmación
                 const confirmationMessage = `✨ *CONFIRMACIÓN DE SOBRETURNO* ✨\n\n` +
