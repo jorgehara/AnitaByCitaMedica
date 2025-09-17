@@ -28,7 +28,7 @@ interface APIResponseWrapper {
 import axios from 'axios'
 import { es } from 'date-fns/locale'
 
-const API_URL = APP_CONFIG.API_URL;
+const API_URL = 'https://micitamedica.me/api';
 console.log('API URL configurada:', API_URL);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -270,24 +270,72 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                 const formattedDate = format(appointmentDate, 'yyyy-MM-dd');
                 const fechaFormateada = formatearFechaEspanol(formattedDate);
 
-                // Mostrar 5 sobreturnos para la mañana y 5 para la tarde
+                // Consultar sobreturnos ocupados para la fecha, solo los confirmados y con isSobreturno true
+                let ocupados = [];
+                try {
+                    const resp = await axios.get(`${API_URL}/sobreturnos?date=${formattedDate}&status=confirmed`);
+                    if (resp.data && Array.isArray(resp.data)) {
+                        ocupados = resp.data
+                            .filter(s => s.isSobreturno === true && s.status === 'confirmed')
+                            .map(s => parseInt(s.sobreturnoNumber, 10))
+                            .filter(n => !isNaN(n));
+                    }
+                } catch (err) {
+                    console.error('[SOBRETURNO] Error consultando ocupados:', err);
+                }
+
+                // Lógica: Si todos los sobreturnos de la mañana están ocupados, mostrar solo los de la tarde
+                const disponiblesManiana = [];
+                const disponiblesTarde = [];
+                for (let i = 1; i <= 5; i++) {
+                    if (!ocupados.includes(i)) {
+                        disponiblesManiana.push({ numero: i });
+                    }
+                }
+                for (let i = 6; i <= 10; i++) {
+                    if (!ocupados.includes(i)) {
+                        disponiblesTarde.push({ numero: i });
+                    }
+                }
+
+                let sobreturnos = [];
                 let message = `📅 *SOBRETURNOS DISPONIBLES PARA HOY*\n`;
                 message += `📆 *Fecha:* ${fechaFormateada}\n\n`;
-                message += '🌅 *Sobreturnos de mañana:*\n';
-                for (let i = 1; i <= 5; i++) {
-                    message += `${i}- Sobreturno ${i}\n`;
+
+                if (disponiblesManiana.length === 0 && disponiblesTarde.length > 0) {
+                    // Solo mostrar los de la tarde
+                    message += '🌇 *Sobreturnos de tarde:*\n';
+                    disponiblesTarde.forEach(s => {
+                        message += `${s.numero}- Sobreturno ${s.numero}\n`;
+                    });
+                    sobreturnos = [...disponiblesTarde];
+                } else {
+                    // Mostrar ambos si hay disponibles en la mañana
+                    if (disponiblesManiana.length > 0) {
+                        message += '🌅 *Sobreturnos de mañana:*\n';
+                        disponiblesManiana.forEach(s => {
+                            message += `${s.numero}- Sobreturno ${s.numero}\n`;
+                        });
+                    }
+                    if (disponiblesTarde.length > 0) {
+                        message += '\n🌇 *Sobreturnos de tarde:*\n';
+                        disponiblesTarde.forEach(s => {
+                            message += `${s.numero}- Sobreturno ${s.numero}\n`;
+                        });
+                    }
+                    sobreturnos = [...disponiblesManiana, ...disponiblesTarde];
                 }
-                message += '\n🌇 *Sobreturnos de tarde:*\n';
-                for (let i = 6; i <= 10; i++) {
-                    message += `${i}- Sobreturno ${i}\n`;
-                }
+
                 message += '\n📝 *Para seleccionar un sobreturno, responde con el número correspondiente (1-10)*';
                 message += '\n❌ Para cancelar, escribe *cancelar*';
 
-                // Guardar los ítems en el estado para la selección
-                const sobreturnos = Array.from({ length: 10 }, (_, idx) => ({ numero: idx + 1 }));
-                await state.update({ availableSobreturnos: sobreturnos, appointmentDate: formattedDate, totalSobreturnos: 10 });
-
+                await state.update({
+                    availableSobreturnos: sobreturnos,
+                    appointmentDate: formattedDate,
+                    totalSobreturnos: sobreturnos.length,
+                    disponiblesManiana,
+                    disponiblesTarde
+                });
                 await flowDynamic(message);
             } catch (error) {
                 console.error('[SOBRETURNO] Error en paso 3:', error);
@@ -324,6 +372,8 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                 const clientName = state.get('clientName');
                 const socialWork = state.get('socialWork');
                 const phone = ctx.from;
+                const disponiblesManiana = state.get('disponiblesManiana') || [];
+                const disponiblesTarde = state.get('disponiblesTarde') || [];
 
                 if (!clientName || !socialWork || !appointmentDate || !sobreturnos) {
                     console.error('[SOBRETURNO] Datos faltantes:', { clientName, socialWork, appointmentDate, sobreturnos });
@@ -333,15 +383,38 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                 }
 
                 // Mostrar confirmación antes de crear
-                await flowDynamic(`⏳ *Procesando tu sobreturno...*\n\n📝 *Resumen:*\n👤 ${clientName}\n🏥 ${socialWork}\n🔢 Sobreturno ${numero}`);
+                await flowDynamic(`⏳ *Procesando tu sobreturno...*\n\n📝 *Resumen:*\n👤 ${clientName}\n🏥 ${socialWork}\n🔢 Sobreturno ${numero}`)
 
 
-                // Asignar horario fijo según el número de sobreturno
-                const sobreturnoHorarios = [
-                    '11:00', '11:15', '11:30', '11:45', '12:00',
+
+                // Asignar horario fijo SOLO tarde (19:00 a 20:00)
+                const sobreturnoHorariosTarde = [
                     '19:00', '19:15', '19:30', '19:45', '20:00'
                 ];
-                const horarioAsignado = sobreturnoHorarios[numero - 1];
+                let horarioAsignado = '';
+                if (disponiblesManiana.length === 0 && disponiblesTarde.length > 0) {
+                    // Solo se pueden seleccionar sobreturnos de la tarde
+                    if (numero >= 6 && numero <= 10) {
+                        horarioAsignado = sobreturnoHorariosTarde[numero - 6];
+                    } else {
+                        await flowDynamic('❌ Solo puedes seleccionar sobreturnos de la tarde (6-10), los de la mañana ya están ocupados.');
+                        return;
+                    }
+                } else {
+                    // Si hay disponibles en la mañana, permitir ambos
+                    if (numero >= 6 && numero <= 10) {
+                        horarioAsignado = sobreturnoHorariosTarde[numero - 6];
+                    } else if (numero >= 1 && numero <= 5) {
+                        // Si selecciona de la mañana, asignar horario de la mañana
+                        const sobreturnoHorariosManiana = [
+                            '11:00', '11:15', '11:30', '11:45', '12:00'
+                        ];
+                        horarioAsignado = sobreturnoHorariosManiana[numero - 1];
+                    } else {
+                        await flowDynamic('❌ Selección inválida. Elige un número entre 1 y 10.');
+                        return;
+                    }
+                }
 
                 // Crear el sobreturno con horario fijo
                 const sobreturnoData = {
