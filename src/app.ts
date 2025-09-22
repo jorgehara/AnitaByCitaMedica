@@ -214,8 +214,9 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
         '2️⃣ Swiss Medical\n' +
         '3️⃣ OSDE\n' +
         '4️⃣ Galeno\n' +
-        '5️⃣ CONSULTA PARTICULAR\n\n' +
-        '_Responde con el número correspondiente (1, 2, 3, 4 o 5):_',
+        '5️⃣ CONSULTA PARTICULAR\n' +
+        '6️⃣ Otras Obras Sociales\n\n' +
+        '_Responde con el número correspondiente (1, 2, 3, 4, 5 o 6):_',
         { capture: true },
         async (ctx, { state, flowDynamic }) => {
             console.log('[SOBRETURNO] Paso 2: Obra social recibida:', ctx.body);
@@ -234,16 +235,17 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                 '2': 'Swiss Medical',
                 '3': 'OSDE',
                 '4': 'Galeno',
-                '5': 'CONSULTA PARTICULAR'
+                '5': 'CONSULTA PARTICULAR',
+                '6': 'Otras Obras Sociales'
             };
-            
+
             const socialWork = socialWorks[socialWorkOption];
-            
+
             if (!socialWork) {
-                await flowDynamic('❌ Opción inválida. Por favor, selecciona un número del 1 al 5.');
+                await flowDynamic('❌ Opción inválida. Por favor, selecciona un número del 1 al 6.');
                 return;
             }
-            
+
             await state.update({ socialWork });
         }
     )
@@ -306,7 +308,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                     // Solo mostrar los de la tarde
                     message += '🌇 *Sobreturnos de tarde:*\n';
                     disponiblesTarde.forEach(s => {
-                        message += `${s.numero}- Sobreturno ${s.numero}\n`;
+                        message += `${s.numero}- Sobreturno\n`;
                     });
                     sobreturnos = [...disponiblesTarde];
                 } else {
@@ -314,19 +316,19 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                     if (disponiblesManiana.length > 0) {
                         message += '🌅 *Sobreturnos de mañana:*\n';
                         disponiblesManiana.forEach(s => {
-                            message += `${s.numero}- Sobreturno ${s.numero}\n`;
+                            message += `${s.numero}- Sobreturno\n`;
                         });
                     }
                     if (disponiblesTarde.length > 0) {
                         message += '\n🌇 *Sobreturnos de tarde:*\n';
                         disponiblesTarde.forEach(s => {
-                            message += `${s.numero}- Sobreturno ${s.numero}\n`;
+                            message += `${s.numero}- Sobreturno\n`;
                         });
                     }
                     sobreturnos = [...disponiblesManiana, ...disponiblesTarde];
                 }
 
-                message += '\n📝 *Para seleccionar un sobreturno, responde con el número correspondiente (1-10)*';
+                message += '\n📝 *Para seleccionar un sobreturno, responde con el número correspondiente*';
                 message += '\n❌ Para cancelar, escribe *cancelar*';
 
                 await state.update({
@@ -654,7 +656,8 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
         '2️⃣ Swiss Medical\n' +
         '3️⃣ OSDE\n' +
         '4️⃣ Galeno\n' +
-        '5️⃣ CONSULTA PARTICULAR',
+        '5️⃣ CONSULTA PARTICULAR\n' +
+        '6️⃣ Otras Obras Sociales\n\n',
         { capture: true }
     )
     .addAction(async (ctx, { state }) => {
@@ -665,6 +668,7 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
             '3': 'OSDE',
             '4': 'Galeno',
             '5': 'CONSULTA PARTICULAR',
+            '6': 'Otras Obras Sociales'
         };
 
         const socialWork = socialWorks[socialWorkOption] || 'CONSULTA PARTICULAR';
@@ -804,7 +808,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             // Hay un flujo activo, no interrumpir
             return;
         }
-        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Consultorio Médico!* 🩺`);
+        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺`);
         await flowDynamic([
             'Puedo ayudarte con las siguientes opciones:',
             '',
