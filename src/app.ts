@@ -216,7 +216,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
         '4️⃣ Galeno\n' +
         '5️⃣ CONSULTA PARTICULAR\n' +
         '6️⃣ Otras Obras Sociales\n\n' +
-        '_Responde con el número correspondiente (1, 2, 3, 4, 5 o 6):_',
+        '_Responde con el número correspondiente (1, 2, 3, 4, 5 o 6)_',
         { capture: true },
         async (ctx, { state, flowDynamic }) => {
             console.log('[SOBRETURNO] Paso 2: Obra social recibida:', ctx.body);
@@ -859,7 +859,7 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
         '4️⃣ Galeno\n' +
         '5️⃣ CONSULTA PARTICULAR\n' +
         '6️⃣ Otras Obras Sociales\n\n'+
-        '_Responde con el número correspondiente (1, 2, 3, 4, 5 o 6):_',
+        '_Responde con el número correspondiente (1, 2, 3, 4, 5 o 6)_',
         { capture: true }
     )
     .addAction(async (ctx, { state }) => {
