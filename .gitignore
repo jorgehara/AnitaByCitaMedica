@@ -9,3 +9,5 @@ node_modules
 *.log
 *qr.png
 *.txt
+pnpm-lock.yaml
+*yarn
