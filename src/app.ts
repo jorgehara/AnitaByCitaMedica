@@ -998,7 +998,7 @@ const adminFlow = addKeyword(['!admin', '!help'])
     });
 
 // Flujo de bienvenida
-const welcomeKeywords = ['hi', 'hello', 'hola', "buenas", "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
+const welcomeKeywords = ['hi', 'hello', 'hola', "buenas","hola doctor","hola Doctor", "doctor", "DOCTOR",  "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
 
 const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
     .addAction(async (ctx, { state, flowDynamic }) => {
