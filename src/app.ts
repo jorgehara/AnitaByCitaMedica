@@ -442,7 +442,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                 }
 
                 // Información de total
-                message += `\nℹ️ Total disponibles: ${sobreturnosDisponibles.length} sobreturnos`;
+                // message += `\nℹ️ Total disponibles: ${sobreturnosDisponibles.length} sobreturnos`;
 
                 message += '\n📝 *Para seleccionar un sobreturno, responde con el número correspondiente*';
                 message += '\n❌ Para cancelar, escribe *cancelar*';
@@ -644,7 +644,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                                 `✅ *¡Tu sobreturno ha sido agendado exitosamente!*\n\n` +
                                 `📅 *Fecha:* ${formatearFechaEspanol(appointmentDate)}\n` +
                                 `🔢 *Sobreturno:* ${numero}\n` +
-                                `🕒 *Horario:* ${horarioMostrado}\n` +
+                                // `🕒 *Horario:* ${horarioMostrado}\n` +
                                 `👤 *Paciente:* ${clientName}\n` +
                                 `📞 *Teléfono:* ${phone}\n` +
                                 `🏥 *Obra Social:* ${socialWork}\n\n` +
@@ -858,7 +858,8 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
         '3️⃣ OSDE\n' +
         '4️⃣ Galeno\n' +
         '5️⃣ CONSULTA PARTICULAR\n' +
-        '6️⃣ Otras Obras Sociales\n\n',
+        '6️⃣ Otras Obras Sociales\n\n'+
+        '_Responde con el número correspondiente (1, 2, 3, 4, 5 o 6):_',
         { capture: true }
     )
     .addAction(async (ctx, { state }) => {
