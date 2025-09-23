@@ -332,26 +332,36 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
 
                         // 2. Verificar disponibilidad en el servicio usando la nueva ruta
                         try {
-                            const validateResponse = await fetch(`${API_URL}/sobreturnos/validate`, {
-                                method: 'POST',
+                            // Primero intentamos con el endpoint específico por número
+                            const validateResponse = await fetch(`${API_URL}/sobreturnos/validate/${numero}`, {
+                                method: 'GET',
                                 headers: {
                                     'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    date: formattedDate,
-                                    sobreturnoNumber: numero
-                                })
+                                }
                             });
 
-                            if (!validateResponse.ok) {
-                                console.error(`[SOBRETURNO FLOW] Error de validación para ${numero}:`, await validateResponse.text());
+                            if (validateResponse.ok) {
+                                const data = await validateResponse.json();
+                                console.log(`[SOBRETURNO FLOW] Respuesta de validación para ${numero}:`, data);
+                                return data.available === true;
+                            }
+                            
+                            // Si falla, intentamos con el endpoint tradicional
+                            const fallbackResponse = await fetch(`${API_URL}/sobreturnos/validate?date=${formattedDate}&sobreturnoNumber=${numero}`, {
+                                method: 'GET',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+
+                            if (!fallbackResponse.ok) {
+                                console.error(`[SOBRETURNO FLOW] Error de validación para ${numero}:`, await fallbackResponse.text());
                                 return false;
                             }
 
-                            const data = await validateResponse.json();
-                            console.log(`[SOBRETURNO FLOW] Respuesta de validación para ${numero}:`, data);
-                            
-                            return data.available === true;
+                            const fallbackData = await fallbackResponse.json();
+                            console.log(`[SOBRETURNO FLOW] Respuesta de validación fallback para ${numero}:`, fallbackData);
+                            return fallbackData.available === true;
                         } catch (apiError) {
                             console.error(`[SOBRETURNO FLOW] Error en llamada al API para ${numero}:`, apiError);
                             return false;
@@ -608,18 +618,25 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                         }
 
                         const result = await response.json();
+                        console.log('[SOBRETURNO] Error en respuesta:', result);
                         
-                        if (result.success) {
+                        // Verificar si la respuesta es válida: o bien tiene success=true o es el objeto sobreturno completo
+                        if (result.success || result._id) {
                             console.log('[SOBRETURNO] Sobreturno creado exitosamente');
                             
                             // Limpiar todas las cachés relacionadas
-                            await fetch(`${API_URL}/sobreturnos/cache/clear`, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({ date: appointmentDate })
-                            });
+                            try {
+                                await fetch(`${API_URL}/sobreturnos/cache/clear`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ date: appointmentDate })
+                                }).catch(e => console.log('Error al limpiar caché, continuando...'));
+                            } catch (cacheError) {
+                                console.log('Error no crítico al limpiar caché:', cacheError);
+                                // Continuamos aunque falle la limpieza de caché
+                            }
                             
                             // Confirmación exitosa con horario específico
                             const horarioMostrado = numero <= 5 ? '11:00' : '19:00';

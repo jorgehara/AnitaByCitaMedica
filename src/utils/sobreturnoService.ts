@@ -328,16 +328,32 @@ export class SobreturnoService {
             // Intentar con el endpoint de validación
             console.log('[SOBRETURNO SERVICE] Consultando endpoint de validación');
             try {
-                const response = await axiosInstance.get('/sobreturnos/validate', {
-                    params: { date, sobreturnoNumber },
+                // Primero intentamos con el nuevo endpoint específico para el número
+                const response = await axiosInstance.get(`/sobreturnos/validate/${sobreturnoNumber}`, {
                     timeout: 3000
                 });
                 console.log('[SOBRETURNO SERVICE] Respuesta validación:', response.data);
+                
                 if (response.data?.available !== undefined) {
                     return response.data.available;
                 }
             } catch (validationError) {
-                console.log('[SOBRETURNO SERVICE] Error en validación, intentando método alternativo');
+                console.log('[SOBRETURNO SERVICE] Error en validación del nuevo endpoint:', validationError.message);
+                
+                // Si falla, intentamos con el endpoint antiguo
+                try {
+                    const response = await axiosInstance.get('/sobreturnos/validate', {
+                        params: { date, sobreturnoNumber },
+                        timeout: 3000
+                    });
+                    console.log('[SOBRETURNO SERVICE] Respuesta validación antiguo endpoint:', response.data);
+                    
+                    if (response.data?.available !== undefined) {
+                        return response.data.available;
+                    }
+                } catch (oldValidationError) {
+                    console.log('[SOBRETURNO SERVICE] Error en validación del endpoint antiguo:', oldValidationError.message);
+                }
             }
 
             // Si el endpoint de validación falla, consultar endpoint de disponibilidad
