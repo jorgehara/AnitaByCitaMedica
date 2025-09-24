@@ -712,11 +712,10 @@ export const availableSlotsFlow = addKeyword(['turnos'])
         const getNextWorkingDay = (date: Date): Date => {
             const nextDate = new Date(date);
             nextDate.setHours(0, 0, 0, 0);
-            
-            if (currentHour >= 18) {
+            // Solo permite reservar para el día siguiente si son las 20:30 o más
+            if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) {
                 nextDate.setDate(nextDate.getDate() + 1);
             }
-            
             while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
                 nextDate.setDate(nextDate.getDate() + 1);
             }
