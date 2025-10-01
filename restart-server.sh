@@ -1,6 +1,6 @@
 #!/bin/bash
 
-interval=60
+interval=1800  # 15 minutos en segundos
 restart_count=0
 log_file="restart-server.log"
 
@@ -8,8 +8,25 @@ while true; do
     restart_count=$((restart_count+1))
     timestamp=$(date +"%Y-%m-%d %H:%M:%S")
     echo "[$timestamp] Reinicio #$restart_count" >> "$log_file"
+    echo "Matando procesos en el puerto 3008..."
+    fuser -k 3008/tcp 2>/dev/null
     echo "Iniciando el servidor... (Reinicio #$restart_count)"
-    npm run dev
-    echo "Servidor detenido. Esperando $interval segundos para reiniciar..."
-    sleep $interval
+    npm run dev &
+    server_pid=$!
+
+    for ((i=0; i<$interval; i++)); do
+        sleep 1
+    if grep -q "SOBRETURNO TIMEOUT" restart-server.log || \
+       grep -q "\\[SOBRETURNO SERVICE\\] Sistema en modo offline:" restart-server.log || \
+       grep -q "\\[nodemon\\] app crashed" restart-server.log || \
+       grep -q "Timed Out" restart-server.log || \
+       grep -q "Missed call" restart-server.log; then
+        echo "SOBRETURNO TIMEOUT, modo offline, app crashed, Timed Out o llamada perdida detectado. Reiniciando inmediatamente..." >> "$log_file"
+        kill $server_pid 2>/dev/null
+        break
+        fi
+    done
+
+    kill $server_pid 2>/dev/null
+    echo "Servidor detenido o reiniciado."
 done
