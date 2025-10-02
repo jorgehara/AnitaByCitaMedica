@@ -23,8 +23,10 @@ while true; do
        grep -q "Missed call" restart-server.log || \
        grep -q "<Buffer" restart-server.log || \
        grep -iq "crash" restart-server.log || \
-       grep -iq "crashed" restart-server.log; then
-        echo "SOBRETURNO TIMEOUT, modo offline, app crashed, Timed Out, llamada perdida, error de clave o crash detectado. Reiniciando inmediatamente..." >> "$log_file"
+       grep -iq "crashed" restart-server.log || \
+       grep -q "Failed to decrypt message with any known session" restart-server.log || \
+       grep -q "Bad MAC" restart-server.log; then
+        echo "SOBRETURNO TIMEOUT, modo offline, app crashed, Timed Out, llamada perdida, error de clave, Bad MAC o crash detectado. Reiniciando inmediatamente..." >> "$log_file"
         kill $server_pid 2>/dev/null
         break
         fi
