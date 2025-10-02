@@ -20,8 +20,11 @@ while true; do
        grep -q "\\[SOBRETURNO SERVICE\\] Sistema en modo offline:" restart-server.log || \
        grep -q "\\[nodemon\\] app crashed" restart-server.log || \
        grep -q "Timed Out" restart-server.log || \
-       grep -q "Missed call" restart-server.log; then
-        echo "SOBRETURNO TIMEOUT, modo offline, app crashed, Timed Out o llamada perdida detectado. Reiniciando inmediatamente..." >> "$log_file"
+       grep -q "Missed call" restart-server.log || \
+       grep -q "<Buffer" restart-server.log || \
+       grep -iq "crash" restart-server.log || \
+       grep -iq "crashed" restart-server.log; then
+        echo "SOBRETURNO TIMEOUT, modo offline, app crashed, Timed Out, llamada perdida, error de clave o crash detectado. Reiniciando inmediatamente..." >> "$log_file"
         kill $server_pid 2>/dev/null
         break
         fi
