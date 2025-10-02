@@ -189,7 +189,7 @@ async function createAppointment(appointmentData: AppointmentData): Promise<APIR
 
 
 //Flujo de sobreturnos - SOLO se activa con la palabra "sobreturnos"
-export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno'])
+export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobreturnos', 'Sobreturno'])
     .addAnswer(
         '🏥 *SOLICITUD DE SOBRETURNOS*\n\n' +
         'Has solicitado un *sobreturno*. Para continuar, necesito algunos datos.\n\n' +
@@ -687,7 +687,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno'])
     );
 
 // Flujo para mostrar los horarios disponibles (citas normales)
-export const availableSlotsFlow = addKeyword(['turnos', 'turno'])
+export const availableSlotsFlow = addKeyword(['turnos', 'turno', 'Turnos', 'Turno'])
     .addAction(async (ctx) => {
         console.log('=== DEPURACIÓN DE ENTRADA ===');
         console.log('Mensaje recibido:', ctx.body);
