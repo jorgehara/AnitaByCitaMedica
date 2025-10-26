@@ -469,26 +469,10 @@
   resolved "https://registry.npmjs.org/@babel/runtime/-/runtime-7.28.4.tgz"
   integrity sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ==
 
-"@builderbot/bot@^1.2.9":
-  version "1.2.9"
-  resolved "https://registry.npmjs.org/@builderbot/bot/-/bot-1.2.9.tgz"
-  integrity sha512-jxHXsjq+uwW5COMpDmu3Iy7Vh7SoPOJ6TaKM0waPdOnwKmKNO6iO80YbuktoJbi60bgsRwQduCTzmeblGqglsw==
-  dependencies:
-    "@ffmpeg-installer/ffmpeg" "^1.1.0"
-    body-parser "^1.20.2"
-    cors "^2.8.5"
-    fluent-ffmpeg "^2.1.2"
-    follow-redirects "^1.15.6"
-    mime-types "^2.1.35"
-    picocolors "^1.0.0"
-    polka "^0.5.2"
-  optionalDependencies:
-    sharp "0.33.3"
-
-"@builderbot/bot@1.3.2-y.0":
-  version "1.3.2-y.0"
-  resolved "https://registry.npmjs.org/@builderbot/bot/-/bot-1.3.2-y.0.tgz"
-  integrity sha512-oC4/1/ojYNj47OwnMIVu+Scq6u5R05nrwMqmFTaRAfqXhqG0F9FXbzwSi7lpP0aqu30jHmdbefC6kGD5tFVz1g==
+"@builderbot/bot@^1.2.9", "@builderbot/bot@1.3.5":
+  version "1.3.5"
+  resolved "https://registry.npmjs.org/@builderbot/bot/-/bot-1.3.5.tgz"
+  integrity sha512-abhp/enQ50HSggar/KJom4I1o7rYEllT8cRwyCpgF/DiGTWBPlDNmz6vfLPMWT4ZBh8I2Dr7wU0rhMpWnt3HLw==
   dependencies:
     "@ffmpeg-installer/ffmpeg" "^1.1.0"
     body-parser "^1.20.2"
@@ -3089,7 +3073,8 @@ libphonenumber-js@^1.10.20:
 
 "libsignal@github:nstar-y/libsignal":
   version "2.0.1"
-  resolved "git+ssh://git@github.com/nstar-y/libsignal.git#ddc70e49f86b458b220433d0d86fdb6ee3732aef"
+  resolved "git+ssh://git@github.com/nstar-y/libsignal.git"
+  integrity sha512-vlmsYSHw4RgsqMukUQG2fOl8FkmbKU+owKqH1yyOlx19EU4b3vGhKos1BE5PJJVVL0JEbzj6Hk6wW2ryrj/bng==
   dependencies:
     curve25519-js "^0.0.4"
     protobufjs "6.8.8"
