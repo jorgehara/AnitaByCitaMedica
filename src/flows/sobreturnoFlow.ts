@@ -126,8 +126,30 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                     throw new Error('No se recibieron datos válidos del servidor');
                 }
 
+                // Obtener hora actual
+                const currentHour = localChatDate.getHours();
                 const disponibles = response.data.data;
-                console.log('[SOBRETURNO FLOW] Sobreturnos disponibles:', disponibles);
+                
+                // Función para encontrar el primer sobreturno disponible según el rango
+                const findFirstAvailable = (start: number, end: number) => {
+                    return disponibles.find(s => 
+                        s.isAvailable && 
+                        s.sobreturnoNumber >= start && 
+                        s.sobreturnoNumber <= end
+                    );
+                };
+
+                // Determinar el sobreturno a asignar
+                let selectedSobreturno;
+                if (currentHour < 12) {
+                    // Antes del mediodía, intentar primero en la mañana
+                    selectedSobreturno = findFirstAvailable(1, 5) || findFirstAvailable(6, 10);
+                } else {
+                    // Después del mediodía, intentar primero en la tarde
+                    selectedSobreturno = findFirstAvailable(6, 10) || findFirstAvailable(1, 5);
+                }
+
+                console.log('[SOBRETURNO FLOW] Sobreturno seleccionado automáticamente:', selectedSobreturno);
 
                 // Eliminar duplicados y validar campos necesarios
                 const sobreturnos = [...new Map(disponibles.map((s: DisponibleItem) => [s.sobreturnoNumber, s])).values()]
@@ -155,7 +177,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                 message += `📆 *Fecha:* ${appointmentDate}\n\n`;
 
                 // Verificar si hay sobreturnos disponibles
-                if (disponiblesManiana.length === 0 && disponiblesTarde.length === 0) {
+                if (!selectedSobreturno) {
                     const noDisponiblesMsg = '❌ Lo siento, no hay sobreturnos disponibles para hoy.\n\n' +
                         'Puedes:\n' +
                         '1️⃣ Intentar más tarde\n' +
@@ -166,34 +188,28 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                     return;
                 }
 
-                // Construir mensaje de sobreturnos disponibles
-                if (disponiblesManiana.length > 0) {
-                    message += '🌅 *Sobreturnos de mañana:*\n';
-                    disponiblesManiana.forEach((s: DisponibleItem) => {
-                        message += `${s.sobreturnoNumber}- Sobreturno ${s.time} hs\n`;
-                    });
-                    message += '\n';
-                }
+                // Construir mensaje con el sobreturno asignado
+                message += '✅ *Te he asignado el siguiente sobreturno:*\n\n';
+                message += `🕐 Horario: ${selectedSobreturno.time} hs\n`;
                 
-                if (disponiblesTarde.length > 0) {
-                    message += '🌇 *Sobreturnos de tarde:*\n';
-                    disponiblesTarde.forEach((s: DisponibleItem) => {
-                        message += `${s.sobreturnoNumber}- Sobreturno ${s.time} hs\n`;
-                    });
-                }
+                // Determinar si es turno mañana o tarde
+                const turno = selectedSobreturno.sobreturnoNumber <= 5 ? 'mañana' : 'tarde';
+                message += `📍 Turno: ${turno}\n\n`;
+                
+                message += '⚠️ *Importante:*\n';
+                message += '- Este sobreturno ha sido asignado automáticamente\n';
+                message += '- Es el primer horario disponible para hoy\n';
+                message += '- Por favor, confirma si podrás asistir\n\n';
+                
+                message += '✍️ Para confirmar este sobreturno, escribe *confirmar*\n';
+                message += '❌ Para cancelar, escribe *cancelar*';
 
-                message += '\n📝 Para seleccionar un sobreturno, responde con el número correspondiente';
-                message += '\n❌ Para cancelar, escribe *cancelar*';
-
-                // Guardar todos los datos necesarios en el estado
+                // Guardar los datos necesarios en el estado
                 await state.update({
                     appointmentDate: formattedDate,
-                    disponiblesManiana,
-                    disponiblesTarde,
+                    selectedSobreturno,
                     lastRefresh: Date.now(),
-                    sobreturnos: {
-                        disponibles: [...disponiblesManiana, ...disponiblesTarde].map((s: DisponibleItem) => s.sobreturnoNumber)
-                    }
+                    clientPhone: ctx.from
                 });
 
                 await flowDynamic(message);

@@ -136,58 +136,46 @@ export class SobreturnoService {
                 timeout: 5000
             });
 
-            if (!response.data) {
-                console.log('[SOBRETURNO SERVICE] No hay datos en la respuesta');
-                return [];
-            }
-
-            if (!Array.isArray(response.data)) {
-                console.error('[SOBRETURNO SERVICE] Respuesta inválida:', response.data);
+            if (!response.data || !Array.isArray(response.data)) {
+                console.log('[SOBRETURNO SERVICE] No hay datos válidos en la respuesta');
                 return [];
             }
 
             console.log('[SOBRETURNO SERVICE] Datos recibidos:', response.data);
 
-            // Primero, validar y formatear los sobreturnos
+            // Validar y formatear los sobreturnos
             const sobreturnos = response.data
                 .filter(s => {
-                    // Validar que sea un sobreturno
-                    if (!s.isSobreturno) {
-                        console.log('[SOBRETURNO SERVICE] Descartando registro que no es sobreturno:', s);
+                    // Validar que sea un sobreturno para la fecha correcta
+                    if (!s.isSobreturno || s.date !== date) {
                         return false;
                     }
-                    
-                    // Los sobreturnos confirmados no están disponibles
-                    if (s.status === 'confirmed') {
-                        console.log('[SOBRETURNO SERVICE] Sobreturno confirmado, no disponible:', s.sobreturnoNumber);
-                        return true;  // Lo incluimos para marcar el número como ocupado
-                    }
-                    
+
                     // Validar el número y horario
                     const timeMap = {
                         '11:00': 1, '11:15': 2, '11:30': 3, '11:45': 4, '12:00': 5,
                         '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
                     };
-                    
+
                     const expectedNumber = timeMap[s.time];
                     if (!expectedNumber) {
-                        console.log('[SOBRETURNO SERVICE] Horario inválido:', s.time);
+                        console.log('[SOBRETURNO SERVICE] Horario no válido:', s.time);
                         return false;
                     }
-                    
-                    // Si tiene número, verificar que coincida con el horario
-                    if (s.sobreturnoNumber && s.sobreturnoNumber !== expectedNumber) {
-                        console.log('[SOBRETURNO SERVICE] Número no coincide con horario:', {
-                            esperado: expectedNumber,
-                            actual: s.sobreturnoNumber,
-                            horario: s.time
-                        });
-                        return false;
+
+                    // Asignar número si no tiene uno
+                    if (!s.sobreturnoNumber) {
+                        s.sobreturnoNumber = expectedNumber;
                     }
-                    
+
                     return true;
                 })
-                .map(s => this.formatSobreturnoResponse(s));
+                .map(s => ({
+                    sobreturnoNumber: s.sobreturnoNumber,
+                    time: s.time,
+                    status: s.status || 'confirmed',
+                    isSobreturno: true
+                }));
 
             console.log('[SOBRETURNO SERVICE] Sobreturnos procesados:', {
                 total: response.data.length,
@@ -308,24 +296,24 @@ export class SobreturnoService {
             // Convertir los números reservados a Set para búsqueda más eficiente
             const reservedNumbersSet = new Set(reservedNumbers);
             
-            // Filtrar horarios válidos y crear lista de disponibles
+            // Crear lista completa de horarios posibles
             const disponibles = Object.entries(timeMap)
-                .filter(([time, num]) => {
-                    // Verificar si el horario es válido para la fecha actual
-                    const now = new Date();
+                .map(([time, num]) => {
                     const [hours, minutes] = time.split(':').map(Number);
                     const appointmentTime = new Date(date);
                     appointmentTime.setHours(hours, minutes, 0, 0);
                     
-                    // Solo incluir horarios futuros y que no estén reservados
-                    return appointmentTime > now && !reservedNumbersSet.has(num);
-                })
-                .map(([time, sobreturnoNumber]) => ({
-                    sobreturnoNumber,
-                    time,
-                    isSobreturno: true,
-                    isAvailable: true
-                }));
+                    const now = new Date();
+                    const isTimeValid = appointmentTime > now;
+                    const isReserved = reservedNumbersSet.has(num);
+                    
+                    return {
+                        sobreturnoNumber: num,
+                        time,
+                        isSobreturno: true,
+                        isAvailable: isTimeValid && !isReserved
+                    };
+                });
 
             console.log('[SOBRETURNO SERVICE] Sobreturnos disponibles después de filtrar:', 
                 disponibles.map(s => s.sobreturnoNumber)
@@ -363,51 +351,39 @@ export class SobreturnoService {
                 return isAvailable;
             }
 
-            // Intentar con el endpoint de validación
-            console.log('[SOBRETURNO SERVICE] Consultando endpoint de validación');
-            try {
-                // Primero intentamos con el nuevo endpoint específico para el número
-                const response = await axiosInstance.get(`/sobreturnos/validate/${sobreturnoNumber}`, {
-                    timeout: 3000
-                });
-                console.log('[SOBRETURNO SERVICE] Respuesta validación:', response.data);
-                
-                if (response.data?.available !== undefined) {
-                    return response.data.available;
-                }
-            } catch (validationError) {
-                console.log('[SOBRETURNO SERVICE] Error en validación del nuevo endpoint:', validationError.message);
-                
-                // Si falla, intentamos con el endpoint antiguo
-                try {
-                    const response = await axiosInstance.get('/sobreturnos/validate', {
-                        params: { date, sobreturnoNumber },
-                        timeout: 3000
-                    });
-                    console.log('[SOBRETURNO SERVICE] Respuesta validación antiguo endpoint:', response.data);
-                    
-                    if (response.data?.available !== undefined) {
-                        return response.data.available;
-                    }
-                } catch (oldValidationError) {
-                    console.log('[SOBRETURNO SERVICE] Error en validación del endpoint antiguo:', oldValidationError.message);
-                }
+            // Primero verificar si el número es válido
+            if (sobreturnoNumber < 1 || sobreturnoNumber > 10) {
+                console.log('[SOBRETURNO SERVICE] Número de sobreturno inválido:', sobreturnoNumber);
+                return false;
             }
 
-            // Si el endpoint de validación falla, consultar endpoint de disponibilidad
-            console.log('[SOBRETURNO SERVICE] Consultando endpoint de disponibilidad');
-            const availableResponse = await axiosInstance.get(`/sobreturnos/available/${date}`);
-            if (Array.isArray(availableResponse.data)) {
-                const disponible = availableResponse.data.some(
-                    s => s.sobreturnoNumber === sobreturnoNumber
-                );
-                console.log('[SOBRETURNO SERVICE] Resultado disponibilidad:', {
-                    sobreturnoNumber,
-                    disponible,
-                    disponibles: availableResponse.data.map(s => s.sobreturnoNumber)
-                });
-                return disponible;
+            // Obtener reservados (ya sea de caché o del servidor)
+            let reservedSlots: SobreturnoResponse[];
+            
+            if (!this.isOnline) {
+                console.log('[SOBRETURNO SERVICE] Modo offline - usando caché');
+                reservedSlots = cache.get<SobreturnoResponse[]>(this.getCacheKey(date)) || [];
+            } else {
+                reservedSlots = await this.getReservedSobreturnos(date);
             }
+
+            // Filtrar por fecha actual y estado confirmado
+            const currentReservations = reservedSlots.filter(slot => {
+                return slot.sobreturnoNumber === sobreturnoNumber && 
+                       slot.status === 'confirmed';
+            });
+
+            const isSlotAvailable = currentReservations.length === 0;
+
+            console.log('[SOBRETURNO SERVICE] Resultado validación:', {
+                date,
+                sobreturnoNumber,
+                reservedCount: reservedSlots.length,
+                matchingReservations: currentReservations.length,
+                isAvailable: isSlotAvailable
+            });
+
+            return isSlotAvailable;
 
             // Si ambos endpoints fallan, verificar con lista de reservados
             console.log('[SOBRETURNO SERVICE] Usando verificación por lista de reservados');
