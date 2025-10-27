@@ -5,9 +5,9 @@
   "main": "dist/app.js",
   "type": "module",
   "scripts": {
-    "start": "ts-node ./src/app.ts",
+    "start": "tsx ./src/app.ts",
     "lint": "eslint . --no-ignore",
-    "dev": "nodemon --exec ts-node ./src/app.ts",
+    "dev": "nodemon --exec tsx ./src/app.ts",
     "build": "tsc",
     "pm2:start": "pm2 start dist/app.js --name anita-bot",
     "pm2:stop": "pm2 stop anita-bot",
