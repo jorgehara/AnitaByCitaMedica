@@ -10,7 +10,12 @@ while true; do
     echo "[$timestamp] Reinicio #$restart_count" >> "$log_file"
     echo "Matando procesos en el puerto 3008..."
     fuser -k 3008/tcp 2>/dev/null
-    echo "Iniciando el servidor... (Reinicio #$restart_count)"
+    echo "Liberando el puerto 3008 si está ocupado..."
+    PID=$(sudo lsof -t -i:3008)
+    if [ ! -z "$PID" ]; then
+      sudo kill -9 $PID
+      echo "Proceso $PID eliminado."
+    fi
     npm run dev &
     server_pid=$!
 
