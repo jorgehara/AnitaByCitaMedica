@@ -136,11 +136,16 @@ export class SobreturnoService {
             // Primero, validar y formatear los sobreturnos
             const sobreturnos = response.data
                 .filter(s => {
-                    // Validar que sea un sobreturno confirmado
-                    const isValid = s.isSobreturno === true && s.status === 'confirmed';
-                    if (!isValid) {
-                        console.log('[SOBRETURNO SERVICE] Descartando registro no confirmado:', s);
+                    // Validar que sea un sobreturno
+                    if (!s.isSobreturno) {
+                        console.log('[SOBRETURNO SERVICE] Descartando registro que no es sobreturno:', s);
                         return false;
+                    }
+                    
+                    // Los sobreturnos confirmados no están disponibles
+                    if (s.status === 'confirmed') {
+                        console.log('[SOBRETURNO SERVICE] Sobreturno confirmado, no disponible:', s.sobreturnoNumber);
+                        return true;  // Lo incluimos para marcar el número como ocupado
                     }
                     
                     // Validar el número y horario
@@ -280,13 +285,26 @@ export class SobreturnoService {
             const reservedNumbers = reservados.map(r => r.sobreturnoNumber);
             console.log('[SOBRETURNO SERVICE] Números reservados:', reservedNumbers);
             
-            // Generar lista de disponibles
+            // Convertir los números reservados a Set para búsqueda más eficiente
+            const reservedNumbersSet = new Set(reservedNumbers);
+            
+            // Filtrar horarios válidos y crear lista de disponibles
             const disponibles = Object.entries(timeMap)
-                .filter(([_, num]) => !reservedNumbers.includes(num))
+                .filter(([time, num]) => {
+                    // Verificar si el horario es válido para la fecha actual
+                    const now = new Date();
+                    const [hours, minutes] = time.split(':').map(Number);
+                    const appointmentTime = new Date(date);
+                    appointmentTime.setHours(hours, minutes, 0, 0);
+                    
+                    // Solo incluir horarios futuros y que no estén reservados
+                    return appointmentTime > now && !reservedNumbersSet.has(num);
+                })
                 .map(([time, sobreturnoNumber]) => ({
                     sobreturnoNumber,
                     time,
-                    isSobreturno: true
+                    isSobreturno: true,
+                    isAvailable: true
                 }));
 
             console.log('[SOBRETURNO SERVICE] Sobreturnos disponibles después de filtrar:', 
