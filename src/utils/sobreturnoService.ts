@@ -108,24 +108,6 @@ export class SobreturnoService {
         await this.checkConnectivity();
         const cacheKey = this.getCacheKey(date);
         
-        const timeMap = {
-            '11:00': 1, '11:15': 2, '11:30': 3, '11:45': 4, '12:00': 5,
-            '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
-        };
-
-        // Función para convertir hora a número de sobreturno
-        const getSlotNumber = (time: string): number => {
-            const hour = parseInt(time.split(':')[0]);
-            const minutes = parseInt(time.split(':')[1]);
-            
-            if (hour === 11) {
-                return Math.floor((minutes / 15) + 1);
-            } else if (hour === 19) {
-                return Math.floor((minutes / 15) + 6);
-            }
-            return hour < 15 ? 1 : 6; // Default slots
-        };
-        
         console.log('[SOBRETURNO SERVICE] Obteniendo sobreturnos:', { date, isOnline: this.isOnline });
         
         if (!this.isOnline) {
@@ -138,15 +120,9 @@ export class SobreturnoService {
         }
 
         try {
-            // Consultar sobreturnos confirmados para la fecha
+            // Consultar sobreturnos para la fecha
             console.log('[SOBRETURNO SERVICE] Consultando API para fecha:', date);
-            const response = await axiosInstance.get(`/sobreturnos/date/${date}`, {
-                params: {
-                    isSobreturno: true,
-                    status: 'confirmed'
-                },
-                timeout: 5000
-            });
+            const response = await axiosInstance.get(`/sobreturnos/date/${date}`);
 
             if (!response.data || !Array.isArray(response.data)) {
                 console.log('[SOBRETURNO SERVICE] No hay datos válidos en la respuesta');
@@ -155,43 +131,16 @@ export class SobreturnoService {
 
             console.log('[SOBRETURNO SERVICE] Datos recibidos:', response.data);
 
-            // Validar y formatear los sobreturnos
-            const sobreturnos = response.data
-                .filter(s => {
-                    // Validar que sea un sobreturno para la fecha correcta
-                    if (!s.isSobreturno || s.date !== date) {
-                        return false;
-                    }
-
-                    // Validar el número y horario
-                    const timeMap = {
-                        '11:00': 1, '11:15': 2, '11:30': 3, '11:45': 4, '12:00': 5,
-                        '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
-                    };
-
-                    const expectedNumber = timeMap[s.time];
-                    if (!expectedNumber) {
-                        console.log('[SOBRETURNO SERVICE] Horario no válido:', s.time);
-                        return false;
-                    }
-
-                    // Asignar número si no tiene uno
-                    if (!s.sobreturnoNumber) {
-                        s.sobreturnoNumber = expectedNumber;
-                    }
-
-                    return true;
-                })
-                .map(s => ({
-                    sobreturnoNumber: s.sobreturnoNumber,
-                    time: s.time,
-                    status: s.status || 'confirmed',
-                    isSobreturno: true
-                }));
+            // Filtrar y formatear los sobreturnos
+            const sobreturnos = response.data.map(s => ({
+                sobreturnoNumber: s.sobreturnoNumber,
+                time: s.time,
+                status: s.status || 'confirmed',
+                isSobreturno: true
+            }));
 
             console.log('[SOBRETURNO SERVICE] Sobreturnos procesados:', {
-                total: response.data.length,
-                válidos: sobreturnos.length,
+                total: sobreturnos.length,
                 números: sobreturnos.map(s => s.sobreturnoNumber)
             });
 
