@@ -146,9 +146,20 @@ export class SobreturnoService {
         await this.checkConnectivity();
         console.log('[SOBRETURNO SERVICE] Iniciando creación de sobreturno:', { 
             date: data.date, 
-            número: data.sobreturnoNumber 
+            número: data.sobreturnoNumber,
+            clientName: data.clientName,
+            socialWork: data.socialWork,
+            phone: data.phone
         });
         
+        // Validar datos requeridos
+        if (!data.clientName || !data.socialWork || !data.phone || !data.date || !data.time || !data.sobreturnoNumber) {
+            return {
+                error: true,
+                message: 'Faltan datos requeridos para crear el sobreturno'
+            };
+        }
+
         if (!this.isOnline) {
             return {
                 error: true,
@@ -211,13 +222,20 @@ export class SobreturnoService {
     }
 
     async getAvailableSobreturnos(date: string): Promise<APIResponseWrapper> {
+        if (!date) {
+            return {
+                error: true,
+                message: 'Se requiere una fecha válida'
+            };
+        }
+
         await this.checkConnectivity();
         console.log('[SOBRETURNO SERVICE] Obteniendo sobreturnos disponibles para:', date);
         const cacheKey = this.getCacheKey(date, 'available');
         
         if (!this.isOnline) {
             console.log('[SOBRETURNO SERVICE] Modo offline - usando caché');
-            const cachedData = cache.get(cacheKey);
+            const cachedData = cache.get<APIResponseWrapper>(cacheKey);
             return cachedData || {
                 error: true,
                 message: 'No hay conexión con el servidor'
@@ -290,40 +308,39 @@ export class SobreturnoService {
         console.log('[SOBRETURNO SERVICE] Verificando disponibilidad:', { date, sobreturnoNumber, isOnline: this.isOnline });
 
         try {
+            if (!this.isOnline) {
+                console.log('[SOBRETURNO SERVICE] Modo offline - usando caché');
+                const cachedReservados = cache.get<SobreturnoResponse[]>(this.getCacheKey(date)) || [];
+                console.log('[SOBRETURNO SERVICE] Datos caché:', { reservadosCount: cachedReservados.length });
+                const isAvailable = !cachedReservados.some(s => s.sobreturnoNumber === sobreturnoNumber);
+                return isAvailable;
+            }
+
             const response = await this.getAvailableSobreturnos(date);
             if (response.error || !response.data?.data) {
                 return false;
             }
 
             const slot = response.data.data.find(s => s.sobreturnoNumber === sobreturnoNumber);
-            return slot?.isAvailable || false;
-            
-            if (!this.isOnline) {
-                console.log('[SOBRETURNO SERVICE] Modo offline - usando caché');
-                reservados = cache.get<SobreturnoResponse[]>(this.getCacheKey(date)) || [];
-                console.log('[SOBRETURNO SERVICE] Datos caché:', { reservadosCount: reservados.length });
-            } else {
-                // Obtener la lista de sobreturnos reservados
-                reservados = await this.getReservedSobreturnos(date);
-                console.log('[SOBRETURNO SERVICE] Sobreturnos reservados:', reservados.map(r => r.sobreturnoNumber));
-            }
-            
-            // Verificar si está reservado
-            const isAvailable = !reservados.some(s => s.sobreturnoNumber === sobreturnoNumber);
+            const isAvailable = slot?.isAvailable || false;
+
             console.log('[SOBRETURNO SERVICE] Resultado disponibilidad:', { 
                 sobreturnoNumber, 
-                isAvailable,
-                reservados: reservados.map(r => r.sobreturnoNumber)
+                isAvailable
             });
-            
+
             return isAvailable;
+
         } catch (error) {
             console.error('[SOBRETURNO SERVICE] Error al verificar disponibilidad:', error);
             
             // Último recurso: verificar con caché
-            const reservados = cache.get<SobreturnoResponse[]>(this.getCacheKey(date)) || [];
-            const isAvailable = !reservados.some(s => s.sobreturnoNumber === sobreturnoNumber);
-            console.log('[SOBRETURNO SERVICE] Resultado fallback caché:', { isAvailable, reservadosCount: reservados.length });
+            const cachedReservados = cache.get<SobreturnoResponse[]>(this.getCacheKey(date)) || [];
+            const isAvailable = !cachedReservados.some(s => s.sobreturnoNumber === sobreturnoNumber);
+            console.log('[SOBRETURNO SERVICE] Resultado fallback caché:', { 
+                isAvailable, 
+                reservadosCount: cachedReservados.length 
+            });
             return isAvailable;
         }
     }

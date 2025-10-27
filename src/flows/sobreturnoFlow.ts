@@ -207,15 +207,26 @@ export const bookSobreturnoFlow = addKeyword<Provider, IDBDatabase>(['sobreturno
                 }
 
                 // Crear sobreturno
-                const result = await sobreturnoService.createSobreturno({
-                    clientName,
-                    socialWork,
-                    phone: ctx.from,
-                    date: appointmentDate,
-                    time: selectedSobreturno.time,
-                    sobreturnoNumber: selectedNumber,
-                    isSobreturno: true
+                // Validar todos los datos antes de enviar
+            if (!clientName || !socialWork || !ctx.from || !appointmentDate || !selectedSobreturno.time || !selectedNumber) {
+                console.error('[SOBRETURNO] Datos incompletos:', {
+                    clientName, socialWork, phone: ctx.from,
+                    date: appointmentDate, time: selectedSobreturno.time,
+                    number: selectedNumber
                 });
+                throw new Error('Datos incompletos');
+            }
+
+            const result = await sobreturnoService.createSobreturno({
+                clientName,
+                socialWork,
+                phone: ctx.from,
+                date: appointmentDate,
+                time: selectedSobreturno.time,
+                sobreturnoNumber: selectedNumber,
+                isSobreturno: true,
+                status: 'confirmed'
+            });
 
                 if (result.error) {
                     throw new Error(result.message);
