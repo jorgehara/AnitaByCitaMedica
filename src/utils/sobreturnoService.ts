@@ -70,20 +70,30 @@ export class SobreturnoService {
 
     private formatSobreturnoResponse(data: any): SobreturnoResponse {
         const time = data.time;
-        let sobreturnoNumber = parseInt(data.sobreturnoNumber, 10);
+        let sobreturnoNumber = data.sobreturnoNumber;
 
-        // Validar que el sobreturnoNumber esté dentro del rango permitido (1-10)
-        if (!sobreturnoNumber || sobreturnoNumber < 1 || sobreturnoNumber > 10) {
-            // Determinar el número de sobreturno basado en el horario exacto
-            const timeMap = {
-                '11:00': 1, '11:15': 2, '11:30': 3, '11:45': 4, '12:00': 5,
-                '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
+        // Si ya tiene un número de sobreturno, usarlo directamente
+        if (sobreturnoNumber && sobreturnoNumber >= 1 && sobreturnoNumber <= 10) {
+            return {
+                sobreturnoNumber,
+                time,
+                status: data.status || 'confirmed',
+                isSobreturno: true
             };
-            sobreturnoNumber = timeMap[time] || 0;
+        }
 
-            if (sobreturnoNumber === 0) {
-                throw new Error('Horario de sobreturno inválido');
-            }
+        // Si no tiene número, intentar asignarlo basado en el horario
+        const timeMap = {
+            '11:00': 1, '11:15': 2, '11:30': 3, '11:45': 4, '12:00': 5,
+            '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
+        };
+
+        sobreturnoNumber = timeMap[time];
+
+        // Si no podemos determinar el número, asignar uno basado en el turno (mañana/tarde)
+        if (!sobreturnoNumber) {
+            const hour = parseInt(time.split(':')[0], 10);
+            sobreturnoNumber = hour < 15 ? 1 : 6; // Default a 1 para mañana, 6 para tarde
         }
 
         return {
@@ -97,6 +107,11 @@ export class SobreturnoService {
     async getReservedSobreturnos(date: string): Promise<SobreturnoResponse[]> {
         await this.checkConnectivity();
         const cacheKey = this.getCacheKey(date);
+        
+        const timeMap = {
+            '11:00': 1, '11:15': 2, '11:30': 3, '11:45': 4, '12:00': 5,
+            '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
+        };
         
         console.log('[SOBRETURNO SERVICE] Obteniendo sobreturnos:', { date, isOnline: this.isOnline });
         
@@ -281,9 +296,14 @@ export class SobreturnoService {
                 '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
             };
             
-            // Obtener números ya reservados
-            const reservedNumbers = reservados.map(r => r.sobreturnoNumber);
-            console.log('[SOBRETURNO SERVICE] Números reservados:', reservedNumbers);
+            // Filtrar y obtener números ya reservados válidos
+            const reservedNumbers = reservados
+                .filter(r => {
+                    if (!r || !r.sobreturnoNumber) return false;
+                    return r.sobreturnoNumber >= 1 && r.sobreturnoNumber <= 10;
+                })
+                .map(r => r.sobreturnoNumber);
+            console.log('[SOBRETURNO SERVICE] Números reservados válidos:', reservedNumbers);
             
             // Convertir los números reservados a Set para búsqueda más eficiente
             const reservedNumbersSet = new Set(reservedNumbers);
