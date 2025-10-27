@@ -12,11 +12,11 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import axios from 'axios';
-import { axiosInstance, retryRequest } from './config/axios.js';
-import { getFallbackSlots } from './utils/fallbackData.js';
-import { APP_CONFIG } from './config/app.js';
-import appointmentService from './utils/appointmentService.js';
-import sobreturnoService from './utils/sobreturnoService.js';
+import { axiosInstance, retryRequest } from './config/axios';
+import { getFallbackSlots } from './utils/fallbackData';
+import { APP_CONFIG } from './config/app';
+import appointmentService from './utils/appointmentService';
+import sobreturnoService from './utils/sobreturnoService';
 
 interface APIResponse {
     success: boolean;
