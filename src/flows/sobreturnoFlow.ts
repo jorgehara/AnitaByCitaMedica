@@ -111,7 +111,7 @@ export const bookSobreturnoFlow = addKeyword<Provider, IDBDatabase>(['sobreturno
                     throw new Error(disponiblesResponse.message || 'Error al consultar sobreturnos');
                 }
 
-                const disponibles = disponiblesResponse.data.data;
+                const disponibles = disponiblesResponse.data.data.filter(s => s.isAvailable);
                 const disponiblesManiana = disponibles.filter(s => s.sobreturnoNumber <= 5);
                 const disponiblesTarde = disponibles.filter(s => s.sobreturnoNumber > 5);
 

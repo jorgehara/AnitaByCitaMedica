@@ -68,33 +68,23 @@ export class SobreturnoService {
         }
     }
 
+    private readonly timeMap = {
+        '11:00': 1, '11:15': 2, '11:30': 3, '11:45': 4, '12:00': 5,
+        '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
+    };
+
+    private getSobreturnoNumber(time: string): number {
+        const number = this.timeMap[time];
+        if (!number) {
+            const hour = parseInt(time.split(':')[0], 10);
+            return hour < 15 ? 1 : 6; // Default a 1 para mañana, 6 para tarde
+        }
+        return number;
+    }
+
     private formatSobreturnoResponse(data: any): SobreturnoResponse {
         const time = data.time;
-        let sobreturnoNumber = data.sobreturnoNumber;
-
-        // Si ya tiene un número de sobreturno, usarlo directamente
-        if (sobreturnoNumber && sobreturnoNumber >= 1 && sobreturnoNumber <= 10) {
-            return {
-                sobreturnoNumber,
-                time,
-                status: data.status || 'confirmed',
-                isSobreturno: true
-            };
-        }
-
-        // Si no tiene número, intentar asignarlo basado en el horario
-        const timeMap = {
-            '11:00': 1, '11:15': 2, '11:30': 3, '11:45': 4, '12:00': 5,
-            '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
-        };
-
-        sobreturnoNumber = timeMap[time];
-
-        // Si no podemos determinar el número, asignar uno basado en el turno (mañana/tarde)
-        if (!sobreturnoNumber) {
-            const hour = parseInt(time.split(':')[0], 10);
-            sobreturnoNumber = hour < 15 ? 1 : 6; // Default a 1 para mañana, 6 para tarde
-        }
+        const sobreturnoNumber = data.sobreturnoNumber || this.getSobreturnoNumber(time);
 
         return {
             sobreturnoNumber,
@@ -300,7 +290,13 @@ export class SobreturnoService {
         console.log('[SOBRETURNO SERVICE] Verificando disponibilidad:', { date, sobreturnoNumber, isOnline: this.isOnline });
 
         try {
-            let reservados: SobreturnoResponse[];
+            const response = await this.getAvailableSobreturnos(date);
+            if (response.error || !response.data?.data) {
+                return false;
+            }
+
+            const slot = response.data.data.find(s => s.sobreturnoNumber === sobreturnoNumber);
+            return slot?.isAvailable || false;
             
             if (!this.isOnline) {
                 console.log('[SOBRETURNO SERVICE] Modo offline - usando caché');
