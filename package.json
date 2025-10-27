@@ -9,10 +9,12 @@
     "lint": "eslint . --no-ignore",
     "dev": "nodemon --exec ts-node ./src/app.ts",
     "build": "npx rollup -c",
-    "pm2:start": "pm2 start ecosystem.config.js",
-    "pm2:stop": "pm2 stop ecosystem.config.js",
-    "pm2:restart": "pm2 restart ecosystem.config.js",
-    "pm2:delete": "pm2 delete ecosystem.config.js"
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop all",
+    "pm2:restart": "pm2 restart all",
+    "pm2:delete": "pm2 delete all",
+    "pm2:logs": "pm2 logs",
+    "pm2:status": "pm2 status"
   },
   "keywords": [],
   "dependencies": {

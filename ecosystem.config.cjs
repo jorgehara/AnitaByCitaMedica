@@ -1,9 +1,11 @@
 module.exports = {
   apps: [{
     name: 'anita-bot',
-    script: 'npm',
-    args: 'run dev',
-    watch: false,
+    script: './src/app.ts',
+    interpreter: 'node',
+    interpreter_args: '--loader ts-node/esm',
+    watch: ['src'],
+    ignore_watch: ['node_modules', 'logs'],
     max_memory_restart: '1G',
     env: {
       NODE_ENV: 'development',
