@@ -31,7 +31,7 @@ interface APIResponseWrapper {
 }
 
 const API_URL = 'https://micitamedica.me/api';
-console.log('API URL configurada:', API_URL);
+console.log('API URL configuradaa:', API_URL);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
