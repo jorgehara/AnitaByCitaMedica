@@ -1,60 +1,53 @@
-import { addKeyword } from '@builderbot/bot'
-import { format } from 'date-fns'
-import { toZonedTime } from 'date-fns-tz'
-import { APP_CONFIG } from '../config/app'
-import { formatearFechaEspanol } from '../utils/dateFormatter'
-import sobreturnoService, { SobreturnoResponse } from '../utils/sobreturnoService'
+import { addKeyword } from '@builderbot/bot';
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+import { APP_CONFIG } from '../config/app';
+import { formatearFechaEspanol } from '../utils/dateFormatter';
+import sobreturnoService, { SobreturnoResponse } from '../utils/sobreturnoService';
+import { BaileysProvider as Provider } from '@builderbot/provider-baileys';
 
-interface DisponibleItem {
-    sobreturnoNumber: number;
-    time: string;
-    status?: string;
+interface SobreturnoState {
+    clientName?: string;
+    socialWork?: string;
+    appointmentDate?: string;
+    availableSobreturnos?: SobreturnoResponse[];
+    invalidName?: boolean;
 }
 
-// Flujo para sobreturnos
-export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
+export const bookSobreturnoFlow = addKeyword<Provider, IDBDatabase>(['sobreturnos'])
     .addAnswer(
         '🏥 *SOLICITUD DE SOBRETURNO*\n\n' +
         'Has solicitado un *sobreturno*. Para continuar, necesito algunos datos.\n\n' +
         'Por favor, indícame tu *NOMBRE* y *APELLIDO* (ej: Juan Pérez):',
         { capture: true },
-        async (ctx, { state, flowDynamic }) => {
+        async (ctx, { flowDynamic, state }) => {
+            console.log('[SOBRETURNO] Paso 1: Nombre recibido:', ctx.body);
             const name = ctx.body.trim();
-            
-            // Validaciones estrictas del nombre
-            if (!name || name.length < 4) {
-                await flowDynamic('❌ El nombre es demasiado corto. Por favor, ingresa tu nombre completo.');
+
+            // Limpiar y normalizar el nombre
+            const cleanName = name.replace(/[^A-Za-záéíóúñÁÉÍÓÚÑ\s]/g, '').trim();
+            const words = cleanName.split(/\s+/).filter(word => word.length > 1);
+
+            // Validaciones
+            if (words.length < 2) {
+                await flowDynamic('❌ Por favor, ingresa tanto tu nombre como tu apellido correctamente.');
                 await state.update({ invalidName: true });
                 return;
             }
 
-            // Limpiar y normalizar el nombre
-            const cleanName = name.trim().replace(/\s+/g, ' ');
-            
-            // Verificar que solo contenga letras y espacios
-            if (!/^[A-Za-záéíóúñÁÉÍÓÚÑ\s]+$/.test(cleanName)) {
+            if (name !== cleanName) {
                 await flowDynamic('❌ El nombre solo debe contener letras (sin números ni caracteres especiales).');
                 await state.update({ invalidName: true });
                 return;
             }
 
-            // Verificar que contenga al menos dos palabras (nombre y apellido)
-            const words = cleanName.split(' ').filter(word => word.length > 1);
-            if (words.length < 2) {
-                await flowDynamic('❌ Por favor, ingresa tanto tu nombre como tu apellido separados por un espacio.');
-                await state.update({ invalidName: true });
-                return;
-            }
-
-            // Verificar longitud mínima de cada palabra
-            if (words.some(word => word.length < 2)) {
-                await flowDynamic('❌ Cada parte del nombre debe tener al menos 2 letras.');
-                await state.update({ invalidName: true });
-                return;
-            }
+            // Capitalizar cada palabra
+            const formattedName = words
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
 
             await state.update({ 
-                clientName: words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '),
+                clientName: formattedName,
                 invalidName: false 
             });
             
@@ -72,7 +65,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
         '_Responde con el número correspondiente (1-6):_',
         { capture: true },
         async (ctx, { state, flowDynamic }) => {
-            const invalidName = state.get('invalidName');
+            const invalidName = await state.get('invalidName');
             if (invalidName) {
                 await flowDynamic('❌ El nombre anterior no es válido. Por favor, ingresa tu nombre completo:');
                 await state.update({ invalidName: false });
@@ -97,6 +90,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
             }
             
             await state.update({ socialWork });
+            console.log('[SOBRETURNO] Paso 2: Obra social recibida:', socialWorkOption);
         }
     )
     .addAnswer(
@@ -107,77 +101,22 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                 const timeZone = APP_CONFIG.TIMEZONE;
                 const now = new Date();
                 const localChatDate = toZonedTime(now, timeZone);
-
-                const appointmentDate = formatearFechaEspanol(localChatDate);
                 const formattedDate = format(localChatDate, 'yyyy-MM-dd');
+                const fechaFormateada = formatearFechaEspanol(formattedDate);
 
-                console.log('[SOBRETURNO FLOW] Consultando disponibilidad para:', formattedDate);
+                // Obtener sobreturnos disponibles
+                const disponiblesResponse = await sobreturnoService.getAvailableSobreturnos(formattedDate);
                 
-                // Obtener sobreturnos disponibles usando el servicio mejorado
-                const response = await sobreturnoService.getAvailableSobreturnos(formattedDate);
-                
-                if (response.error) {
-                    console.error('[SOBRETURNO FLOW] Error al obtener sobreturnos:', response.message);
-                    await flowDynamic('❌ Lo siento, hay un problema al consultar los sobreturnos disponibles. Por favor, intenta más tarde.');
-                    return;
+                if (disponiblesResponse.error || !disponiblesResponse.data?.data) {
+                    throw new Error(disponiblesResponse.message || 'Error al consultar sobreturnos');
                 }
 
-                if (!response.data?.data) {
-                    throw new Error('No se recibieron datos válidos del servidor');
-                }
+                const disponibles = disponiblesResponse.data.data;
+                const disponiblesManiana = disponibles.filter(s => s.sobreturnoNumber <= 5);
+                const disponiblesTarde = disponibles.filter(s => s.sobreturnoNumber > 5);
 
-                // Obtener hora actual
-                const currentHour = localChatDate.getHours();
-                const disponibles = response.data.data;
-                
-                // Función para encontrar el primer sobreturno disponible según el rango
-                const findFirstAvailable = (start: number, end: number) => {
-                    return disponibles.find(s => 
-                        s.isAvailable && 
-                        s.sobreturnoNumber >= start && 
-                        s.sobreturnoNumber <= end
-                    );
-                };
-
-                // Determinar el sobreturno a asignar
-                let selectedSobreturno;
-                if (currentHour < 12) {
-                    // Antes del mediodía, intentar primero en la mañana
-                    selectedSobreturno = findFirstAvailable(1, 5) || findFirstAvailable(6, 10);
-                } else {
-                    // Después del mediodía, intentar primero en la tarde
-                    selectedSobreturno = findFirstAvailable(6, 10) || findFirstAvailable(1, 5);
-                }
-
-                console.log('[SOBRETURNO FLOW] Sobreturno seleccionado automáticamente:', selectedSobreturno);
-
-                // Eliminar duplicados y validar campos necesarios
-                const sobreturnos = [...new Map(disponibles.map((s: DisponibleItem) => [s.sobreturnoNumber, s])).values()]
-                    .filter((s: DisponibleItem) => 
-                        s.sobreturnoNumber && 
-                        s.time && 
-                        (s.sobreturnoNumber >= 1 && s.sobreturnoNumber <= 10) &&
-                        !s.status // Solo incluir los no reservados
-                    )
-                    .sort((a: DisponibleItem, b: DisponibleItem) => a.sobreturnoNumber - b.sobreturnoNumber);
-
-                console.log('[SOBRETURNO FLOW] Sobreturnos después de filtrar:', sobreturnos);
-
-                const disponiblesManiana = sobreturnos.filter((s: DisponibleItem) => s.sobreturnoNumber <= 5);
-                const disponiblesTarde = sobreturnos.filter((s: DisponibleItem) => s.sobreturnoNumber > 5);
-                
-                // Guardar en el estado para su uso posterior
-                await state.update({
-                    appointmentDate: formattedDate,
-                    availableSobreturnos: sobreturnos,
-                    lastCheck: Date.now()
-                });
-
-                let message = `📅 *SOBRETURNOS DISPONIBLES PARA HOY*\n`;
-                message += `📆 *Fecha:* ${appointmentDate}\n\n`;
-
-                // Verificar si hay sobreturnos disponibles
-                if (!selectedSobreturno) {
+                // Si no hay sobreturnos disponibles
+                if (disponiblesManiana.length === 0 && disponiblesTarde.length === 0) {
                     const noDisponiblesMsg = '❌ Lo siento, no hay sobreturnos disponibles para hoy.\n\n' +
                         'Puedes:\n' +
                         '1️⃣ Intentar más tarde\n' +
@@ -188,65 +127,121 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos'])
                     return;
                 }
 
-                // Construir mensaje con el sobreturno asignado
-                message += '✅ *Te he asignado el siguiente sobreturno:*\n\n';
-                message += `🕐 Horario: ${selectedSobreturno.time} hs\n`;
-                
-                // Determinar si es turno mañana o tarde
-                const turno = selectedSobreturno.sobreturnoNumber <= 5 ? 'mañana' : 'tarde';
-                message += `📍 Turno: ${turno}\n\n`;
-                
-                message += '⚠️ *Importante:*\n';
-                message += '- Este sobreturno ha sido asignado automáticamente\n';
-                message += '- Es el primer horario disponible para hoy\n';
-                message += '- Por favor, confirma si podrás asistir\n\n';
-                
-                message += '✍️ Para confirmar este sobreturno, escribe *confirmar*\n';
-                message += '❌ Para cancelar, escribe *cancelar*';
+                // Construir mensaje de disponibilidad
+                let message = `📅 *SOBRETURNOS DISPONIBLES*\n`;
+                message += `📆 *Fecha:* ${fechaFormateada}\n\n`;
 
-                // Guardar los datos necesarios en el estado
+                if (disponiblesManiana.length > 0) {
+                    message += '🌅 *Sobreturnos de mañana:*\n';
+                    disponiblesManiana.forEach(s => {
+                        message += `${s.sobreturnoNumber}- Sobreturno ${s.time} hs\n`;
+                    });
+                    message += '\n';
+                }
+
+                if (disponiblesTarde.length > 0) {
+                    message += '🌇 *Sobreturnos de tarde:*\n';
+                    disponiblesTarde.forEach(s => {
+                        message += `${s.sobreturnoNumber}- Sobreturno ${s.time} hs\n`;
+                    });
+                }
+
+                message += `\n📝 Para seleccionar un sobreturno, responde con el número correspondiente`;
+                message += '\n❌ Para cancelar, escribe *cancelar*';
+
+                // Guardar estado
                 await state.update({
                     appointmentDate: formattedDate,
-                    selectedSobreturno,
-                    lastRefresh: Date.now(),
-                    clientPhone: ctx.from
+                    availableSobreturnos: disponibles
                 });
 
                 await flowDynamic(message);
             } catch (error) {
                 console.error('[SOBRETURNO] Error en paso 3:', error);
                 
-                // Manejar diferentes tipos de errores
                 let errorMessage = '❌ ';
-                
                 if (error.message?.includes('conexión')) {
                     errorMessage += 'No pude conectarme al sistema. Por favor, verifica tu conexión a internet e intenta nuevamente.';
-                } else if (error.message?.includes('inválido')) {
-                    errorMessage += 'El horario seleccionado no es válido. Por favor, elige otro horario disponible.';
-                } else if (error.response?.status === 409) {
-                    errorMessage += 'Este sobreturno ya ha sido reservado. Voy a actualizar la lista de disponibles.';
-                    // Limpiar cache para forzar nueva consulta
-                    await state.update({ lastCheck: 0 });
-                } else if (error.response?.status === 400) {
-                    errorMessage += 'Los datos ingresados no son válidos. Por favor, verifica la información e intenta nuevamente.';
                 } else {
-                    errorMessage += 'Ocurrió un error inesperado. Por favor, intenta nuevamente más tarde.';
+                    errorMessage += 'Ocurrió un error al consultar los sobreturnos disponibles. Por favor, intenta nuevamente más tarde.';
                 }
                 
                 await flowDynamic(errorMessage);
-                
-                // Solo limpiar el estado si es un error fatal
-                if (!error.response || error.response.status >= 500) {
-                    await state.clear();
-                }
-                
-                console.log('[SOBRETURNO] Detalles del error:', {
-                    message: error.message,
-                    status: error.response?.status,
-                    data: error.response?.data
-                });
+                await state.clear();
             }
         }
     )
-    // ... Resto del flujo de sobreturnos
-;
+    .addAnswer(
+        '✍️ *Selecciona el sobreturno que deseas:*\n\n_Responde con el número del sobreturno elegido (1-10)_',
+        { capture: true },
+        async (ctx, { flowDynamic, state }) => {
+            try {
+                const userInput = ctx.body.trim().toLowerCase();
+
+                if (userInput === 'cancelar') {
+                    await flowDynamic('👋 Has cancelado la solicitud de sobreturno. ¡Hasta luego!');
+                    await state.clear();
+                    return;
+                }
+
+                const selectedNumber = parseInt(userInput);
+                if (isNaN(selectedNumber) || selectedNumber < 1 || selectedNumber > 10) {
+                    await flowDynamic('❌ Por favor, ingresa un número válido entre 1 y 10.');
+                    return;
+                }
+
+                const availableSobreturnos = state.get('availableSobreturnos') || [];
+                const clientName = state.get('clientName');
+                const socialWork = state.get('socialWork');
+                const appointmentDate = state.get('appointmentDate');
+
+                if (!clientName || !socialWork || !appointmentDate || !availableSobreturnos) {
+                    throw new Error('Datos incompletos');
+                }
+
+                const selectedSobreturno = availableSobreturnos.find(s => s.sobreturnoNumber === selectedNumber);
+
+                if (!selectedSobreturno) {
+                    await flowDynamic('❌ El número de sobreturno seleccionado no está disponible.');
+                    return;
+                }
+
+                // Crear sobreturno
+                const result = await sobreturnoService.createSobreturno({
+                    clientName,
+                    socialWork,
+                    phone: ctx.from,
+                    date: appointmentDate,
+                    time: selectedSobreturno.time,
+                    sobreturnoNumber: selectedNumber,
+                    isSobreturno: true
+                });
+
+                if (result.error) {
+                    throw new Error(result.message);
+                }
+
+                // Confirmar reserva
+                const confirmMessage = `✅ *¡Sobreturno confirmado!*\n\n` +
+                    `📅 Fecha: ${formatearFechaEspanol(appointmentDate)}\n` +
+                    `🕒 Hora: ${selectedSobreturno.time} hs\n` +
+                    `👤 Paciente: ${clientName}\n` +
+                    `🏥 Obra Social: ${socialWork}\n\n` +
+                    `ℹ️ Te esperamos en el consultorio 10 minutos antes.`;
+
+                await flowDynamic(confirmMessage);
+                await state.clear();
+
+            } catch (error) {
+                console.error('[SOBRETURNO] Error en selección:', error);
+                const errorMsg = error.message === 'Datos incompletos' ?
+                    '❌ Hubo un problema con tus datos. Por favor, inicia el proceso nuevamente.' :
+                    '❌ No se pudo reservar el sobreturno. Por favor, intenta nuevamente más tarde.';
+                
+                await flowDynamic(errorMsg);
+                await state.clear();
+            }
+        }
+    );
+
+export default bookSobreturnoFlow;
