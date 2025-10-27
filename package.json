@@ -8,13 +8,12 @@
     "start": "ts-node ./src/app.ts",
     "lint": "eslint . --no-ignore",
     "dev": "nodemon --exec ts-node ./src/app.ts",
-    "build": "npx rollup -c",
-    "pm2:start": "pm2 start ecosystem.config.cjs",
-    "pm2:stop": "pm2 stop all",
-    "pm2:restart": "pm2 restart all",
-    "pm2:delete": "pm2 delete all",
-    "pm2:logs": "pm2 logs",
-    "pm2:status": "pm2 status"
+    "build": "tsc",
+    "pm2:start": "pm2 start dist/app.js --name anita-bot",
+    "pm2:stop": "pm2 stop anita-bot",
+    "pm2:restart": "pm2 restart anita-bot",
+    "pm2:delete": "pm2 delete anita-bot",
+    "pm2:logs": "pm2 logs anita-bot"
   },
   "keywords": [],
   "dependencies": {
