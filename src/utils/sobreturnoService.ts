@@ -297,7 +297,7 @@ export class SobreturnoService {
             return result;
 
         } catch (error: any) {
-            console.error('Error al obtener sobreturnos disponibles:', error);
+            console.error('Error al obtener sobreturnos disponibless:', error);
             // Intentar usar caché como último recurso
             const cachedData = cache.get(cacheKey);
             return cachedData || {
