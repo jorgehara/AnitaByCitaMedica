@@ -184,24 +184,22 @@ export class SobreturnoService {
     }
 
     async createSobreturno(data: SobreturnoData): Promise<APIResponseWrapper> {
-        if (!this.isOnline) {
-            return {
-                error: true,
-                message: 'No hay conexión con el servidor. Por favor, intente más tarde.'
-            };
-        }
-
         console.log('[SOBRETURNO SERVICE] Iniciando creación de sobreturno:', {
             date: data.date,
             número: data.sobreturnoNumber
         });
 
         try {
-            // Verificación simple de disponibilidad
-            const reservados = await this.getReservedSobreturnos(data.date);
-            const isAvailable = !reservados.some(s => s.sobreturnoNumber === data.sobreturnoNumber);
+            // Verificar disponibilidad directamente con el servidor
+            const validationResponse = await axiosInstance.get(`/sobreturnos/validate`, {
+                params: {
+                    date: data.date,
+                    sobreturnoNumber: data.sobreturnoNumber
+                },
+                timeout: 3000
+            });
 
-            if (!isAvailable) {
+            if (!validationResponse.data?.available) {
                 return {
                     error: true,
                     message: 'El sobreturno ya no está disponible'
@@ -239,48 +237,53 @@ export class SobreturnoService {
     }
 
     async getAvailableSobreturnos(date: string): Promise<APIResponseWrapper> {
-        await this.checkConnectivity();
         console.log('[SOBRETURNO SERVICE] Obteniendo sobreturnos disponibles para:', date);
         const cacheKey = this.getCacheKey(date, 'available');
         
-        try {
-            // Intentar obtener del servidor primero
-            if (this.isOnline) {
-                try {
-                    const response = await axiosInstance.get(`/sobreturnos/available/${date}`, {
-                        timeout: 5000
-                    });
+        // Primero intentar usar caché
+        const cachedData = cache.get(cacheKey);
+        if (cachedData) {
+            console.log('[SOBRETURNO SERVICE] Usando datos en caché');
+            return cachedData;
+        }
 
-                    if (response.data?.data) {
-                        const result: APIResponseWrapper = {
-                            data: {
-                                success: true,
-                                data: response.data.data
-                            }
-                        };
-                        cache.set(cacheKey, result);
-                        return result;
+        try {
+            // Intentar obtener datos del servidor
+            const response = await axiosInstance.get(`/sobreturnos/available/${date}`, {
+                timeout: 5000
+            });
+
+            if (response.data?.data) {
+                const result: APIResponseWrapper = {
+                    data: {
+                        success: true,
+                        data: response.data.data
                     }
-                } catch (serverError) {
-                    console.warn('[SOBRETURNO SERVICE] Error al consultar servidor:', serverError.message);
-                }
+                };
+                cache.set(cacheKey, result);
+                return result;
             }
 
-            // Si no hay conexión o falló la consulta al servidor, usar lógica local
-            const reservados = await this.getReservedSobreturnos(date);
-            const reservedNumbers = reservados.map(r => r.sobreturnoNumber);
-
+            // Si no hay datos del servidor, generar lista local
             const timeMap = {
                 '11:00': 1, '11:15': 2, '11:30': 3, '11:45': 4, '12:00': 5,
                 '19:00': 6, '19:15': 7, '19:30': 8, '19:45': 9, '20:00': 10
             };
+
+            // Obtener reservados de forma directa sin validaciones adicionales
+            const reservados = await axiosInstance.get(`/sobreturnos`, {
+                params: { date, status: 'confirmed' }
+            });
+
+            const reservedNumbers = reservados.data?.map(r => r.sobreturnoNumber) || [];
             
             const disponibles = Object.entries(timeMap)
                 .filter(([_, num]) => !reservedNumbers.includes(num))
                 .map(([time, sobreturnoNumber]) => ({
                     sobreturnoNumber,
                     time,
-                    isSobreturno: true
+                    isSobreturno: true,
+                    isAvailable: true
                 }));
 
             const result: APIResponseWrapper = {
