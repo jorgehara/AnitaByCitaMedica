@@ -1022,7 +1022,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             '• Todas las citas se confirman automáticamente',
             '',
             '¿En qué puedo ayudarte hoy?',
-            '📢⚠️**HOY VIERNES 31/10/2025 EL DOCTOR KULINKA ATENDERÁ TURNO TARDE** ⚠️'
+            '📢⚠️*HOY VIERNES 31/10/2025 DOCTOR KULINKA ATENDERÁ TURNO TARDE* ⚠️'
         ].join('\n'));
     });
 
