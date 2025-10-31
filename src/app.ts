@@ -1021,7 +1021,8 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             '• Los sobreturnos son para atención el mismo día (sujeto a disponibilidad)',
             '• Todas las citas se confirman automáticamente',
             '',
-            '¿En qué puedo ayudarte hoy?'
+            '¿En qué puedo ayudarte hoy?',
+            '📢⚠️**HOY VIERNES 31/10/2025 EL DOCTOR KULINKA ATENDERÁ TURNO TARDE** ⚠️'
         ].join('\n'));
     });
 
