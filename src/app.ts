@@ -1037,7 +1037,7 @@ const main = async () => {
         adminFlow
     ])
     
-      const adapterProvider = createProvider(Provider, {
+    const adapterProvider = createProvider(Provider, {
         version: [2, 3000, 1025190524] as any
     })
     // const adapterProvider = createProvider(Provider)
