@@ -1009,7 +1009,10 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             // Hay un flujo activo, no interrumpir
             return;
         }
-        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺`);
+        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
+📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️`,
+            
+        );
         await flowDynamic([
             'Puedo ayudarte con las siguientes opciones:',
             '',
@@ -1020,9 +1023,9 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             '• Las citas normales se programan con anticipación',
             '• Los sobreturnos son para atención el mismo día (sujeto a disponibilidad)',
             '• Todas las citas se confirman automáticamente',
-            '',
-            '¿En qué puedo ayudarte hoy?',
-            // '📢⚠️*HOY VIERNES 31/10/2025 DOCTOR KULINKA ATENDERÁ TURNO TARDE* ⚠️'
+            // '',
+            // '¿En qué puedo ayudarte hoy?',
+            '📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️'
         ].join('\n'));
     });
 
