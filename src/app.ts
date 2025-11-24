@@ -1043,8 +1043,8 @@ const main = async () => {
     const adapterFlow = createFlow([
         // Flujos principales
         welcomeFlow,
-        bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
-        availableSlotsFlow,  // Se activa con "horarios", "disponibles", "turnos", "horario"
+        //bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
+        //availableSlotsFlow,  // Se activa con "horarios", "disponibles", "turnos", "horario"
         clientDataFlow,
         goodbyeFlow,
         adminFlow
