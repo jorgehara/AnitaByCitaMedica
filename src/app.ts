@@ -121,17 +121,17 @@ interface APIResponseWrapper {
 
 function formatearFechaEspanol(fecha: string): string {
     const timeZone = 'America/Argentina/Buenos_Aires';
-    const date = fecha.includes('T') ? 
+    const date = fecha.includes('T') ?
         toZonedTime(new Date(fecha), timeZone) :
         toZonedTime(new Date(fecha + 'T00:00:00'), timeZone);
-        
+
     console.log('8. Formateando fechaa:', date);
     const nombreDia = format(date, 'EEEE', { locale: es });
     const diaDelMes = format(date, 'dd');
     console.log('7. Día del mes:', diaDelMes);
     const nombreMes = format(date, 'MMMM', { locale: es });
     const año = format(date, 'yyyy');
-    
+
     return `${nombreDia} ${diaDelMes} de ${nombreMes} de ${año}`;
 }
 
@@ -139,7 +139,7 @@ async function fetchAvailableSlots(date: Date): Promise<APIResponseWrapper> {
     const formattedDate = format(date, 'yyyy-MM-dd');
     console.log('=== DEBUG FETCH SLOTS ===');
     console.log('9. Consultando slots disponibles para:', formattedDate);
-    
+
     try {
         const result = await retryRequest(async () => {
             const response = await axiosInstance.get<APIResponse>(`/appointments/available/${formattedDate}`);
@@ -150,9 +150,9 @@ async function fetchAvailableSlots(date: Date): Promise<APIResponseWrapper> {
         if (result.error === 'timeout' || result.error === true) {
             console.log('Usando sistema de respaldo debido a problemas de conexión');
             const fallbackData = getFallbackSlots(formattedDate);
-            return { 
+            return {
                 data: fallbackData,
-                message: 'Estamos experimentando problemas de conexión. Mostrando horarios disponibles del sistema de respaldo.' 
+                message: 'Estamos experimentando problemas de conexión. Mostrando horarios disponibles del sistema de respaldo.'
             };
         }
 
@@ -168,10 +168,10 @@ async function fetchAvailableSlots(date: Date): Promise<APIResponseWrapper> {
                 url: error.config?.url
             });
         }
-        
+
         console.log('Usando sistema de respaldo debido a error en la petición');
         const fallbackData = getFallbackSlots(formattedDate);
-        return { 
+        return {
             data: fallbackData,
             message: 'Estamos experimentando problemas técnicos. Mostrando horarios disponibles del sistema de respaldo.'
         };
@@ -198,13 +198,13 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
         async (ctx, { state }) => {
             console.log('[SOBRETURNO] Paso 1: Nombre recibido:', ctx.body);
             const name = ctx.body.trim();
-            
+
             // Validar que el nombre no esté vacío
             if (!name || name.length < 2) {
                 await state.update({ invalidName: true });
                 return;
             }
-            
+
             await state.update({ clientName: name, invalidName: false });
         }
     )
@@ -220,7 +220,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
         { capture: true },
         async (ctx, { state, flowDynamic }) => {
             console.log('[SOBRETURNO] Paso 2: Obra social recibida:', ctx.body);
-            
+
             // Verificar si el nombre anterior fue inválido
             const invalidName = state.get('invalidName');
             if (invalidName) {
@@ -228,7 +228,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                 await state.update({ invalidName: false });
                 return;
             }
-            
+
             const socialWorkOption = ctx.body.trim();
             const socialWorks = {
                 '1': 'INSSSEP',
@@ -274,7 +274,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
 
                 // Sistema de recuperación de datos con reintentos
                 console.log('[SOBRETURNO FLOW] Iniciando sistema de consulta robusta...');
-                
+
                 let reservados = [];
                 const retryCount = 0;
                 const maxRetries = 3;
@@ -282,10 +282,10 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                 // Obtener estado actual de sobreturnos
                 try {
                     console.log('[SOBRETURNO FLOW] Consultando estado de sobreturnos...');
-                    
+
                     // Obtener directamente del servicio sin caché
                     const response = await sobreturnoService.getSobreturnosStatus(formattedDate);
-                    
+
                     if (response && response.data) {
                         reservados = response.data.reservados || [];
                         console.log('[SOBRETURNO FLOW] Estado obtenido:', {
@@ -301,7 +301,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                     console.error('[SOBRETURNO FLOW] Error al obtener estado:', error);
                     reservados = [];
                 }
-                
+
                 // Convertir array de números ocupados a Set para búsqueda eficiente
                 const ocupadosSet = new Set(reservados.map(s => s.sobreturnoNumber));
                 console.log('[SOBRETURNO FLOW] Números ocupados:', Array.from(ocupadosSet));
@@ -313,7 +313,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                 // Lógica: Si todos los sobreturnos de la mañana están ocupados, mostrar solo los de la tarde
                 const disponiblesManiana = [];
                 const disponiblesTarde = [];
-                
+
                 // Sistema de verificación de disponibilidad con validación cruzada
                 console.log('[SOBRETURNO FLOW] Iniciando verificación robusta de disponibilidad...');
 
@@ -323,7 +323,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                 const verificarDisponibilidad = async (numero: number): Promise<boolean> => {
                     try {
                         console.log(`[SOBRETURNO FLOW] Verificando disponibilidad para número ${numero}...`);
-                        
+
                         // 1. Verificar si está en la lista de ocupados
                         if (ocupadosSet.has(numero)) {
                             console.log(`[SOBRETURNO FLOW] Número ${numero} ocupado localmente`);
@@ -345,7 +345,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                                 console.log(`[SOBRETURNO FLOW] Respuesta de validación para ${numero}:`, data);
                                 return data.available === true;
                             }
-                            
+
                             // Si falla, intentamos con el endpoint tradicional
                             const fallbackResponse = await fetch(`${API_URL}/sobreturnos/validate?date=${formattedDate}&sobreturnoNumber=${numero}`, {
                                 method: 'GET',
@@ -384,7 +384,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
 
                 // Verificar mañana y tarde en paralelo para mayor eficiencia
                 const verificacionesManiana = await Promise.all(
-                    Array.from({length: 5}, (_, i) => i + 1)
+                    Array.from({ length: 5 }, (_, i) => i + 1)
                         .map(async num => ({
                             numero: num,
                             disponible: await verificarDisponibilidad(num)
@@ -392,7 +392,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                 );
 
                 const verificacionesTarde = await Promise.all(
-                    Array.from({length: 5}, (_, i) => i + 6)
+                    Array.from({ length: 5 }, (_, i) => i + 6)
                         .map(async num => ({
                             numero: num,
                             disponible: await verificarDisponibilidad(num)
@@ -407,13 +407,13 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                 disponiblesTarde.push(...verificacionesTarde
                     .filter(v => v.disponible)
                     .map(v => ({ numero: v.numero })));
-                
+
                 console.log('[SOBRETURNO FLOW] Disponibles mañana:', disponiblesManiana);
                 console.log('[SOBRETURNO FLOW] Disponibles tarde:', disponiblesTarde);
 
                 // Verificar si hay sobreturnos disponibles
                 const sobreturnosDisponibles = [...disponiblesManiana, ...disponiblesTarde];
-                
+
                 if (sobreturnosDisponibles.length === 0) {
                     await flowDynamic('❌ Lo siento, no hay sobreturnos disponibles para hoy.');
                     return;
@@ -547,7 +547,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
 
                 // Enviar sobreturnoData al backend
                 try {
-                        // Validación doble de disponibilidad
+                    // Validación doble de disponibilidad
                     console.log('[SOBRETURNO] Validando disponibilidad final:', {
                         date: appointmentDate,
                         numero: numero
@@ -579,7 +579,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                         console.error('[SOBRETURNO] Error al actualizar estado:', error);
                         // Continuar con la lista vacía en caso de error
                     }
-                    
+
                     // 3. Verificar si ya está reservado
                     const yaReservado = reservadosActuales.some(r => r.sobreturnoNumber === numero);
                     if (yaReservado) {
@@ -597,7 +597,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                     }
 
                     console.log('[SOBRETURNO] Creando sobreturno:', sobreturnoData);
-                    
+
                     try {
                         // Crear sobreturno usando la nueva ruta directa
                         const response = await fetch(`${API_URL}/sobreturnos`, {
@@ -619,11 +619,11 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
 
                         const result = await response.json();
                         console.log('[SOBRETURNO] Error en respuesta:', result);
-                        
+
                         // Verificar si la respuesta es válida: o bien tiene success=true o es el objeto sobreturno completo
                         if (result.success || result._id) {
                             console.log('[SOBRETURNO] Sobreturno creado exitosamente');
-                            
+
                             // Limpiar todas las cachés relacionadas
                             try {
                                 await fetch(`${API_URL}/sobreturnos/cache/clear`, {
@@ -637,7 +637,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                                 console.log('Error no crítico al limpiar caché:', cacheError);
                                 // Continuamos aunque falle la limpieza de caché
                             }
-                            
+
                             // Confirmación exitosa con horario específico
                             const horarioMostrado = numero <= 5 ? '11:00' : '19:00';
                             const confirmationMessage = `✨ *CONFIRMACIÓN DE SOBRETURNO* ✨\n\n` +
@@ -662,13 +662,13 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                     } catch (error) {
                         console.error('[SOBRETURNO] Error detallado:', error);
                         let errorMessage = '❌ Lo siento, ocurrió un error al agendar el sobreturno.';
-                        
+
                         if (error.message.includes('already exists')) {
                             errorMessage = '❌ Este sobreturno ya ha sido reservado por otro paciente.';
                         } else if (error.message.includes('not available')) {
                             errorMessage = '❌ Este sobreturno ya no está disponible.';
                         }
-                        
+
                         await flowDynamic(errorMessage + ' Por favor, intenta con otro número o más tarde.');
                         return;
                     }
@@ -693,127 +693,127 @@ export const availableSlotsFlow = addKeyword(['turnos', 'turno', 'Turnos', 'Turn
         console.log('Mensaje recibido:', ctx.body);
         console.log('Tipo de mensaje:', typeof ctx.body);
     })
-.addAction(async (ctx, { flowDynamic, state }) => {
-    try {
-        console.log('=== DEBUG SLOTS FLOW ===');
-        console.log('1. Iniciando flujo de horarios disponibles');
-        console.log('Mensaje recibido:', ctx.body);
-        console.log('API URL:', API_URL);
-        const timeZone = 'America/Argentina/Buenos_Aires';
-        
-        const now = new Date();
-        const localChatDate = toZonedTime(now, timeZone);
-        
-        const currentHour = parseInt(format(localChatDate, 'HH'), 10);
-        const currentMinute = parseInt(format(localChatDate, 'mm'), 10);
-        
-        console.log('2. Hora actual:', `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`);
+    .addAction(async (ctx, { flowDynamic, state }) => {
+        try {
+            console.log('=== DEBUG SLOTS FLOW ===');
+            console.log('1. Iniciando flujo de horarios disponibles');
+            console.log('Mensaje recibido:', ctx.body);
+            console.log('API URL:', API_URL);
+            const timeZone = 'America/Argentina/Buenos_Aires';
 
-        const getNextWorkingDay = (date: Date): Date => {
-            const nextDate = new Date(date);
-            nextDate.setHours(0, 0, 0, 0);
-            // Solo permite reservar para el día siguiente si son las 20:30 o más
-            if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) {
-                nextDate.setDate(nextDate.getDate() + 1);
-            }
-            while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
-                nextDate.setDate(nextDate.getDate() + 1);
-            }
-            return nextDate;
-        };
+            const now = new Date();
+            const localChatDate = toZonedTime(now, timeZone);
 
-        const appointmentDate = getNextWorkingDay(localChatDate);
-        const formattedDate = format(appointmentDate, 'yyyy-MM-dd');
-        console.log('3. Fecha de cita:', formattedDate);
+            const currentHour = parseInt(format(localChatDate, 'HH'), 10);
+            const currentMinute = parseInt(format(localChatDate, 'mm'), 10);
 
-        // Obtener las citas reservadas antes de mostrar los horarios disponibles
-        const reservedTimes = await getReservedAppointments(formattedDate);
-        console.log('4. Horarios reservados:', reservedTimes);
+            console.log('2. Hora actual:', `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`);
 
-        const slotResponse = await fetchAvailableSlots(appointmentDate);
-        const { data } = slotResponse;
+            const getNextWorkingDay = (date: Date): Date => {
+                const nextDate = new Date(date);
+                nextDate.setHours(0, 0, 0, 0);
+                // Solo permite reservar para el día siguiente si son las 20:30 o más
+                if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) {
+                    nextDate.setDate(nextDate.getDate() + 1);
+                }
+                while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
+                    nextDate.setDate(nextDate.getDate() + 1);
+                }
+                return nextDate;
+            };
 
-        if (data.success) {
-            const fechaFormateada = formatearFechaEspanol(data.data.displayDate);
-            let message = `📅 *Horarios disponibles*\n`;
-            message += `📆 Para el día: *${fechaFormateada}*\n\n`;
-            
-            const slots: TimeSlot[] = [];
-            let morningMessage = '';
-            let afternoonMessage = '';
-            
-            // Actualizamos el filtrado de horarios incluyendo la verificación de reservas
-            const availableMorning = data.data.available.morning
-                .filter(slot => {
-                    const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
-                    
-                    if (reservedTimes.includes(slot.displayTime)) {
-                        return false;
-                    }
-                    
-                    if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
-                        return slot.status === 'available' && 
-                               (slotHour > currentHour || 
-                                (slotHour === currentHour && slotMinute > currentMinute));
-                    }
-                    return slot.status === 'available';
+            const appointmentDate = getNextWorkingDay(localChatDate);
+            const formattedDate = format(appointmentDate, 'yyyy-MM-dd');
+            console.log('3. Fecha de cita:', formattedDate);
+
+            // Obtener las citas reservadas antes de mostrar los horarios disponibles
+            const reservedTimes = await getReservedAppointments(formattedDate);
+            console.log('4. Horarios reservados:', reservedTimes);
+
+            const slotResponse = await fetchAvailableSlots(appointmentDate);
+            const { data } = slotResponse;
+
+            if (data.success) {
+                const fechaFormateada = formatearFechaEspanol(data.data.displayDate);
+                let message = `📅 *Horarios disponibles*\n`;
+                message += `📆 Para el día: *${fechaFormateada}*\n\n`;
+
+                const slots: TimeSlot[] = [];
+                let morningMessage = '';
+                let afternoonMessage = '';
+
+                // Actualizamos el filtrado de horarios incluyendo la verificación de reservas
+                const availableMorning = data.data.available.morning
+                    .filter(slot => {
+                        const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
+
+                        if (reservedTimes.includes(slot.displayTime)) {
+                            return false;
+                        }
+
+                        if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
+                            return slot.status === 'available' &&
+                                (slotHour > currentHour ||
+                                    (slotHour === currentHour && slotMinute > currentMinute));
+                        }
+                        return slot.status === 'available';
+                    });
+
+                const availableAfternoon = data.data.available.afternoon
+                    .filter(slot => {
+                        const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
+
+                        if (reservedTimes.includes(slot.displayTime)) {
+                            return false;
+                        }
+
+                        if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
+                            return slot.status === 'available' &&
+                                (slotHour > currentHour ||
+                                    (slotHour === currentHour && slotMinute > currentMinute));
+                        }
+                        return slot.status === 'available';
+                    });
+
+                if (availableMorning.length > 0) {
+                    morningMessage = `*🌅 Horarios de mañana:*\n`;
+                    availableMorning.forEach((slot, index) => {
+                        slots.push(slot);
+                        morningMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
+                    });
+                    message += morningMessage + '\n';
+                }
+
+                if (availableAfternoon.length > 0) {
+                    afternoonMessage = `*🌇 Horarios de tarde:*\n`;
+                    availableAfternoon.forEach((slot, index) => {
+                        slots.push(slot);
+                        afternoonMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
+                    });
+                    message += afternoonMessage;
+                }
+
+                if (slots.length === 0) {
+                    await flowDynamic('❌ Lo siento, no hay horarios disponibles para el día solicitado.');
+                    return;
+                }
+
+                await state.update({
+                    availableSlots: slots,
+                    appointmentDate: format(appointmentDate, 'yyyy-MM-dd'),
+                    fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
+                    conversationStartTime: format(localChatDate, 'HH:mm'),
                 });
 
-            const availableAfternoon = data.data.available.afternoon
-                .filter(slot => {
-                    const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
-                    
-                    if (reservedTimes.includes(slot.displayTime)) {
-                        return false;
-                    }
-                    
-                    if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
-                        return slot.status === 'available' && 
-                               (slotHour > currentHour || 
-                                (slotHour === currentHour && slotMinute > currentMinute));
-                    }
-                    return slot.status === 'available';
-                });
-
-            if (availableMorning.length > 0) {
-                morningMessage = `*🌅 Horarios de mañana:*\n`;
-                availableMorning.forEach((slot, index) => {
-                    slots.push(slot);
-                    morningMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
-                });
-                message += morningMessage + '\n';
+                await flowDynamic(message);
+            } else {
+                await flowDynamic('Lo siento, hubo un problema al obtener los horarios disponibles. Por favor, intenta nuevamente.');
             }
-            
-            if (availableAfternoon.length > 0) {
-                afternoonMessage = `*🌇 Horarios de tarde:*\n`;
-                availableAfternoon.forEach((slot, index) => {
-                    slots.push(slot);
-                    afternoonMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
-                });
-                message += afternoonMessage;
-            }
-
-            if (slots.length === 0) {
-                await flowDynamic('❌ Lo siento, no hay horarios disponibles para el día solicitado.');
-                return;
-            }
-
-            await state.update({
-                availableSlots: slots,
-                appointmentDate: format(appointmentDate, 'yyyy-MM-dd'),
-                fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
-                conversationStartTime: format(localChatDate, 'HH:mm'),
-            });
-
-            await flowDynamic(message);
-        } else {
-            await flowDynamic('Lo siento, hubo un problema al obtener los horarios disponibles. Por favor, intenta nuevamente.');
+        } catch (error) {
+            console.error('Error al procesar la respuesta:', error);
+            await flowDynamic('Lo siento, ocurrió un error al consultar los horarios. Por favor, intenta nuevamente más tarde.');
         }
-    } catch (error) {
-        console.error('Error al procesar la respuesta:', error);
-        await flowDynamic('Lo siento, ocurrió un error al consultar los horarios. Por favor, intenta nuevamente más tarde.');
-    }
-})
+    })
 
     .addAnswer('✍️ Por favor, indica el número del horario que deseas reservar. Si no deseas reservar, escribe *cancelar*.', { capture: true }, async (ctx, { gotoFlow, flowDynamic, state }) => {
         if (ctx.body.toLowerCase() === 'cancelar') {
@@ -823,19 +823,19 @@ export const availableSlotsFlow = addKeyword(['turnos', 'turno', 'Turnos', 'Turn
 
         const selectedSlotNumber = parseInt(ctx.body);
         const availableSlots = state.get('availableSlots');
-        
+
         if (isNaN(selectedSlotNumber) || selectedSlotNumber < 1 || selectedSlotNumber > availableSlots.length) {
             await flowDynamic('Número de horario inválido. Por favor, intenta nuevamente.');
             return;
         }
-        
+
         const selectedSlot = availableSlots[selectedSlotNumber - 1];
         await state.update({ selectedSlot: selectedSlot });
-        
+
         console.log('=== DEBUG ESTADO ANTES DE DIRIGIR A BOOK APPOINTMENT ===');
         console.log('selectedSlot guardado:', selectedSlot);
         console.log('appointmentDate:', state.get('appointmentDate'));
-        
+
         // Dirigir al flujo de recopilación de datos del cliente
         return gotoFlow(clientDataFlow);
     });
@@ -857,7 +857,7 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
         '3️⃣ OSDE\n' +
         '4️⃣ Galeno\n' +
         '5️⃣ CONSULTA PARTICULAR\n' +
-        '6️⃣ Otras Obras Sociales\n\n'+
+        '6️⃣ Otras Obras Sociales\n\n' +
         '_Responde con el número correspondiente (1, 2, 3, 4, 5 o 6)_',
         { capture: true }
     )
@@ -946,7 +946,7 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
             console.error('Error al crear la cita:', error);
             await flowDynamic('❌ Lo siento, ocurrió un error al crear la cita. Por favor, intenta nuevamente más tarde.');
         }
-        
+
         // Limpiar estado y dirigir a goodbyeFlow
         await state.clear();
         return gotoFlow(goodbyeFlow);
@@ -996,38 +996,48 @@ const adminFlow = addKeyword(['!admin', '!help'])
         }
     });
 
-// Flujo de bienvenida
-const welcomeKeywords = ['hi', 'hello', 'hola', "buenas","hola doctor","hola Doctor", "doctor", "DOCTOR",  "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
 
-const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
+//FLujo Bienvenida dias de no atencion
+const welcomeKeywords = ['hi', 'hello', 'hola', "buenas", "hola doctor", "hola Doctor", "doctor", "DOCTOR", "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
+
+const welcomeFlow = addKeyword(welcomeKeywords)
     .addAction(async (ctx, { state, flowDynamic }) => {
-        // Solo mostrar bienvenida si NO hay flujo activo ni datos de sobreturno en progreso
-        const clientName = state.get('clientName');
-        const socialWork = state.get('socialWork');
-        const availableSlots = state.get('availableSlots');
-        if (clientName || socialWork || availableSlots) {
-            // Hay un flujo activo, no interrumpir
-            return;
-        }
         await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
-📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️`,
-            
-        );
-        await flowDynamic([
-            'Puedo ayudarte con las siguientes opciones:',
-            '',
-            '📅 Escribe *"turnos"* - Ver horarios disponibles para citas normales',
-            '🏥 Escribe *"sobreturnos"* - Solicitar un sobreturno urgente',
-            '',
-            '💡 *Información importante:*',
-            '• Las citas normales se programan con anticipación',
-            '• Los sobreturnos son para atención el mismo día (sujeto a disponibilidad)',
-            '• Todas las citas se confirman automáticamente',
-            // '',
-            // '¿En qué puedo ayudarte hoy?',
-            '📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️'
-        ].join('\n'));
+📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* por favor comunicarse nuevamente, la próxima semana⚠️`,);
     });
+
+// Flujo de bienvenida normal
+// const welcomeKeywords = ['hi', 'hello', 'hola', "buenas","hola doctor","hola Doctor", "doctor", "DOCTOR",  "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
+
+// const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
+//     .addAction(async (ctx, { state, flowDynamic }) => {
+//         // Solo mostrar bienvenida si NO hay flujo activo ni datos de sobreturno en progreso
+//         const clientName = state.get('clientName');
+//         const socialWork = state.get('socialWork');
+//         const availableSlots = state.get('availableSlots');
+//         if (clientName || socialWork || availableSlots) {
+//             // Hay un flujo activo, no interrumpir
+//             return;
+//         }
+//         await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
+// 📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️`,
+
+//         );
+//         await flowDynamic([
+//             'Puedo ayudarte con las siguientes opciones:',
+//             '',
+//             '📅 Escribe *"turnos"* - Ver horarios disponibles para citas normales',
+//             '🏥 Escribe *"sobreturnos"* - Solicitar un sobreturno urgente',
+//             '',
+//             '💡 *Información importante:*',
+//             '• Las citas normales se programan con anticipación',
+//             '• Los sobreturnos son para atención el mismo día (sujeto a disponibilidad)',
+//             '• Todas las citas se confirman automáticamente',
+//             // '',
+//             // '¿En qué puedo ayudarte hoy?',
+//             '📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️'
+//         ].join('\n'));
+//     });
 
 const main = async () => {
     const adapterFlow = createFlow([
@@ -1039,7 +1049,7 @@ const main = async () => {
         goodbyeFlow,
         adminFlow
     ])
-    
+
     const adapterProvider = createProvider(Provider, {
         version: [2, 3000, 1025190524] as any
     })
