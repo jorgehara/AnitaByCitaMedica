@@ -997,54 +997,53 @@ const adminFlow = addKeyword(['!admin', '!help'])
     });
 
 
-//FLujo Bienvenida dias de no atencion
-const welcomeKeywords = ['hi', 'hello', 'hola', "buenas", "hola doctor", "hola Doctor", "doctor", "DOCTOR", "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
+// //FLujo Bienvenida dias de no atencion
+// const welcomeKeywords = ['hi', 'hello', 'hola', "buenas", "hola doctor", "hola Doctor", "doctor", "DOCTOR", "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
 
-const welcomeFlow = addKeyword(welcomeKeywords)
-    .addAction(async (ctx, { state, flowDynamic }) => {
-        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
-📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* por favor comunicarse nuevamente, la próxima semana⚠️`,);
-    });
+// const welcomeFlow = addKeyword(welcomeKeywords)
+//     .addAction(async (ctx, { state, flowDynamic }) => {
+//         await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
+// 📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* por favor comunicarse nuevamente, la próxima semana⚠️`,);
+//     });
 
 // Flujo de bienvenida normal
-// const welcomeKeywords = ['hi', 'hello', 'hola', "buenas","hola doctor","hola Doctor", "doctor", "DOCTOR",  "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
+ const welcomeKeywords = ['hi', 'hello', 'hola', "buenas","hola doctor","hola Doctor", "doctor", "DOCTOR",  "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
 
-// const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
-//     .addAction(async (ctx, { state, flowDynamic }) => {
-//         // Solo mostrar bienvenida si NO hay flujo activo ni datos de sobreturno en progreso
-//         const clientName = state.get('clientName');
-//         const socialWork = state.get('socialWork');
-//         const availableSlots = state.get('availableSlots');
-//         if (clientName || socialWork || availableSlots) {
-//             // Hay un flujo activo, no interrumpir
-//             return;
-//         }
-//         await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
-// 📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️`,
+const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
+    .addAction(async (ctx, { state, flowDynamic }) => {
+        // Solo mostrar bienvenida si NO hay flujo activo ni datos de sobreturno en progreso
+        const clientName = state.get('clientName');
+        const socialWork = state.get('socialWork');
+        const availableSlots = state.get('availableSlots');
+        if (clientName || socialWork || availableSlots) {
+            // Hay un flujo activo, no interrumpir
+            return;
+        }
+        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺`,
 
-//         );
-//         await flowDynamic([
-//             'Puedo ayudarte con las siguientes opciones:',
-//             '',
-//             '📅 Escribe *"turnos"* - Ver horarios disponibles para citas normales',
-//             '🏥 Escribe *"sobreturnos"* - Solicitar un sobreturno urgente',
-//             '',
-//             '💡 *Información importante:*',
-//             '• Las citas normales se programan con anticipación',
-//             '• Los sobreturnos son para atención el mismo día (sujeto a disponibilidad)',
-//             '• Todas las citas se confirman automáticamente',
-//             // '',
-//             // '¿En qué puedo ayudarte hoy?',
-//             '📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️'
-//         ].join('\n'));
-//     });
+        );
+        await flowDynamic([
+            'Puedo ayudarte con las siguientes opciones:',
+            '',
+            '📅 Escribe *"turnos"* - Ver horarios disponibles para citas normales',
+            '🏥 Escribe *"sobreturnos"* - Solicitar un sobreturno urgente',
+            '',
+            '💡 *Información importante:*',
+            '• Las citas normales se programan con anticipación',
+            '• Los sobreturnos son para atención el mismo día (sujeto a disponibilidad)',
+            '• Todas las citas se confirman automáticamente',
+            // '',
+            // '¿En qué puedo ayudarte hoy?',
+            // '📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️'
+        ].join('\n'));
+    });
 
 const main = async () => {
     const adapterFlow = createFlow([
         // Flujos principales
         welcomeFlow,
-        //bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
-        //availableSlotsFlow,  // Se activa con "horarios", "disponibles", "turnos", "horario"
+        bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
+        availableSlotsFlow,  // Se activa con "horarios", "disponibles", "turnos", "horario"
         clientDataFlow,
         goodbyeFlow,
         adminFlow
