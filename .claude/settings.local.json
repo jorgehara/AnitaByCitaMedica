@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(xargs cat:*)",
+      "WebSearch",
+      "Bash(Get-Content:*)",
+      "Bash(Select-Object -Last 100)",
+      "Bash(ls:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

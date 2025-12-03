@@ -1019,7 +1019,8 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             // Hay un flujo activo, no interrumpir
             return;
         }
-        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺`,
+        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
+                        📢 *Viernes 5 de Diciembre* - *Atención sólo turno tarde*`,
 
         );
         await flowDynamic([
