@@ -187,7 +187,7 @@ async function createAppointment(appointmentData: AppointmentData): Promise<APIR
     return appointmentService.createAppointment(appointmentData);
 }
 
-
+//#region SOBRETURNOS FLOW
 //Flujo de sobreturnos - SOLO se activa con la palabra "sobreturnos"
 export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobreturnos', 'Sobreturno'])
     .addAnswer(
@@ -685,9 +685,19 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
             }
         }
     );
+//#endregion SOBRETURNOS FLOW
+
+
+
 
 // Flujo para mostrar los horarios disponibles (citas normales)
-export const availableSlotsFlow = addKeyword(['turnos', 'turno', 'Turnos', 'Turno'])
+const allKeywords = [
+    'hola', 'hi', 'hello', 'buenas', 'hola doctor', 'doctor', 'DOCTOR',
+    'buenos días', 'buenas tardes', 'buenas noches', 'ho', 'ola', 'ole',
+    'turnos', 'turno', 'Turnos', 'Turno',
+    'quiero un turno', 'solicito un turno', 'necesito un turno', 'agenda un turno', 'reservar turno', 'quiero reservar', 'quiero sacar turno', 'quiero sacar un turno', 'quiero pedir turno', 'quiero pedir un turno', 'quiero pedir cita', 'quiero cita', 'cita', 'citas', 'agenda cita', 'agenda una cita', 'agenda un turno', 'quiero agendar', 'quiero agendar cita', 'quiero agendar un turno', 'quiero agendar una cita', 'solicito cita', 'solicito una cita', 'solicito un turno', 'solicito agendar', 'solicito agendar cita', 'solicito agendar un turno', 'solicito agendar una cita'
+];
+export const availableSlotsFlow = addKeyword(allKeywords as [string, ...string[]])
     .addAction(async (ctx) => {
         console.log('=== DEPURACIÓN DE ENTRADA ===');
         console.log('Mensaje recibido:', ctx.body);
@@ -735,7 +745,7 @@ export const availableSlotsFlow = addKeyword(['turnos', 'turno', 'Turnos', 'Turn
 
             if (data.success) {
                 const fechaFormateada = formatearFechaEspanol(data.data.displayDate);
-                let message = `📅 *Horarios disponibles*\n`;
+                let message = `🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺\n\n📅 *Horarios disponibles*\n`;
                 message += `📆 Para el día: *${fechaFormateada}*\n\n`;
 
                 const slots: TimeSlot[] = [];
@@ -1007,44 +1017,12 @@ const adminFlow = addKeyword(['!admin', '!help'])
 //     });
 
 // Flujo de bienvenida normal
- const welcomeKeywords = ['hi', 'hello', 'hola', "buenas","hola doctor","hola Doctor", "doctor", "DOCTOR",  "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
-
-const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
-    .addAction(async (ctx, { state, flowDynamic }) => {
-        // Solo mostrar bienvenida si NO hay flujo activo ni datos de sobreturno en progreso
-        const clientName = state.get('clientName');
-        const socialWork = state.get('socialWork');
-        const availableSlots = state.get('availableSlots');
-        if (clientName || socialWork || availableSlots) {
-            // Hay un flujo activo, no interrumpir
-            return;
-        }
-        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
-                        📢 *Viernes 5 de Diciembre* - *Atención sólo turno tarde*`,
-
-        );
-        await flowDynamic([
-            'Puedo ayudarte con las siguientes opciones:',
-            '',
-            '📅 Escribe *"turnos"* - Ver horarios disponibles para citas normales',
-            '🏥 Escribe *"sobreturnos"* - Solicitar un sobreturno urgente',
-            '',
-            '💡 *Información importante:*',
-            '• Las citas normales se programan con anticipación',
-            '• Los sobreturnos son para atención el mismo día (sujeto a disponibilidad)',
-            '• Todas las citas se confirman automáticamente',
-            // '',
-            // '¿En qué puedo ayudarte hoy?',
-            // '📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️'
-        ].join('\n'));
-    });
 
 const main = async () => {
     const adapterFlow = createFlow([
         // Flujos principales
-        welcomeFlow,
         bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
-        availableSlotsFlow,  // Se activa con "horarios", "disponibles", "turnos", "horario"
+        availableSlotsFlow,  // Se activa con saludos y cualquier consulta de turno
         clientDataFlow,
         goodbyeFlow,
         adminFlow
