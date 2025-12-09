@@ -699,159 +699,6 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
         }
     );
 
-// Flujo para mostrar los horarios disponibles (citas normales)
-export const availableSlotsFlow = addKeyword(['turnos', 'turno', 'Turnos', 'Turno'])
-    .addAction(async (ctx) => {
-        console.log('=== DEPURACIÓN DE ENTRADA ===');
-        console.log('Mensaje recibido:', ctx.body);
-        console.log('Tipo de mensaje:', typeof ctx.body);
-    })
-    .addAction(async (ctx, { flowDynamic, state }) => {
-        try {
-            console.log('=== DEBUG SLOTS FLOW ===');
-            console.log('1. Iniciando flujo de horarios disponibles');
-            console.log('Mensaje recibido:', ctx.body);
-            console.log('API URL:', API_URL);
-            const timeZone = 'America/Argentina/Buenos_Aires';
-
-            const now = new Date();
-            const localChatDate = toZonedTime(now, timeZone);
-
-            const currentHour = parseInt(format(localChatDate, 'HH'), 10);
-            const currentMinute = parseInt(format(localChatDate, 'mm'), 10);
-
-            console.log('2. Hora actual:', `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`);
-
-            const getNextWorkingDay = (date: Date): Date => {
-                const nextDate = new Date(date);
-                nextDate.setHours(0, 0, 0, 0);
-                // Solo permite reservar para el día siguiente si son las 20:30 o más
-                if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) {
-                    nextDate.setDate(nextDate.getDate() + 1);
-                }
-                while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
-                    nextDate.setDate(nextDate.getDate() + 1);
-                }
-                return nextDate;
-            };
-
-            const appointmentDate = getNextWorkingDay(localChatDate);
-            const formattedDate = format(appointmentDate, 'yyyy-MM-dd');
-            console.log('3. Fecha de cita:', formattedDate);
-
-            // Obtener las citas reservadas antes de mostrar los horarios disponibles
-            const reservedTimes = await getReservedAppointments(formattedDate);
-            console.log('4. Horarios reservados:', reservedTimes);
-
-            const slotResponse = await fetchAvailableSlots(appointmentDate);
-            const { data } = slotResponse;
-
-            if (data.success) {
-                const fechaFormateada = formatearFechaEspanol(data.data.displayDate);
-                let message = `📅 *Horarios disponibles*\n`;
-                message += `📆 Para el día: *${fechaFormateada}*\n\n`;
-
-                const slots: TimeSlot[] = [];
-                let morningMessage = '';
-                let afternoonMessage = '';
-
-                // Actualizamos el filtrado de horarios incluyendo la verificación de reservas
-                const availableMorning = data.data.available.morning
-                    .filter(slot => {
-                        const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
-
-                        if (reservedTimes.includes(slot.displayTime)) {
-                            return false;
-                        }
-
-                        if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
-                            return slot.status === 'available' &&
-                                (slotHour > currentHour ||
-                                    (slotHour === currentHour && slotMinute > currentMinute));
-                        }
-                        return slot.status === 'available';
-                    });
-
-                const availableAfternoon = data.data.available.afternoon
-                    .filter(slot => {
-                        const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
-
-                        if (reservedTimes.includes(slot.displayTime)) {
-                            return false;
-                        }
-
-                        if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
-                            return slot.status === 'available' &&
-                                (slotHour > currentHour ||
-                                    (slotHour === currentHour && slotMinute > currentMinute));
-                        }
-                        return slot.status === 'available';
-                    });
-
-                if (availableMorning.length > 0) {
-                    morningMessage = `*🌅 Horarios de mañana:*\n`;
-                    availableMorning.forEach((slot, index) => {
-                        slots.push(slot);
-                        morningMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
-                    });
-                    message += morningMessage + '\n';
-                }
-
-                if (availableAfternoon.length > 0) {
-                    afternoonMessage = `*🌇 Horarios de tarde:*\n`;
-                    availableAfternoon.forEach((slot, index) => {
-                        slots.push(slot);
-                        afternoonMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
-                    });
-                    message += afternoonMessage;
-                }
-
-                if (slots.length === 0) {
-                    await flowDynamic('❌ Lo siento, no hay horarios disponibles para el día solicitado.');
-                    return;
-                }
-
-                await state.update({
-                    availableSlots: slots,
-                    appointmentDate: format(appointmentDate, 'yyyy-MM-dd'),
-                    fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
-                    conversationStartTime: format(localChatDate, 'HH:mm'),
-                });
-
-                await flowDynamic(message);
-            } else {
-                await flowDynamic('Lo siento, hubo un problema al obtener los horarios disponibles. Por favor, intenta nuevamente.');
-            }
-        } catch (error) {
-            console.error('Error al procesar la respuesta:', error);
-            await flowDynamic('Lo siento, ocurrió un error al consultar los horarios. Por favor, intenta nuevamente más tarde.');
-        }
-    })
-
-    .addAnswer('✍️ Por favor, indica el número del horario que deseas reservar. Si no deseas reservar, escribe *cancelar*.', { capture: true }, async (ctx, { gotoFlow, flowDynamic, state }) => {
-        if (ctx.body.toLowerCase() === 'cancelar') {
-            await flowDynamic(`❌ *Reserva cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!`);
-            return gotoFlow(goodbyeFlow);
-        }
-
-        const selectedSlotNumber = parseInt(ctx.body);
-        const availableSlots = state.get('availableSlots');
-
-        if (isNaN(selectedSlotNumber) || selectedSlotNumber < 1 || selectedSlotNumber > availableSlots.length) {
-            await flowDynamic('Número de horario inválido. Por favor, intenta nuevamente.');
-            return;
-        }
-
-        const selectedSlot = availableSlots[selectedSlotNumber - 1];
-        await state.update({ selectedSlot: selectedSlot });
-
-        console.log('=== DEBUG ESTADO ANTES DE DIRIGIR A BOOK APPOINTMENT ===');
-        console.log('selectedSlot guardado:', selectedSlot);
-        console.log('appointmentDate:', state.get('appointmentDate'));
-
-        // Dirigir al flujo de recopilación de datos del cliente
-        return gotoFlow(clientDataFlow);
-    });
 
 // Flujo para recopilar datos del cliente y crear la cita normal
 export const clientDataFlow = addKeyword(['datos_cliente'])
@@ -1019,8 +866,8 @@ const adminFlow = addKeyword(['!admin', '!help'])
 // 📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* por favor comunicarse nuevamente, la próxima semana⚠️`,);
 //     });
 
-// Flujo de bienvenida normal
- const welcomeKeywords = ['hi', 'hello', 'hola', "buenas","hola doctor","hola Doctor", "doctor", "DOCTOR",  "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole"].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
+// Flujo de bienvenida con horarios disponibles
+const welcomeKeywords = ['hi', 'hello', 'hola', "buenas","hola doctor","hola Doctor", "doctor", "DOCTOR",  "buenos días", "buenas tardes", "buenas noches", "ho", "hola ", "ola", "ola ", "hi", "ole", 'turnos', 'turno', 'Turnos', 'Turno'].map(saludo => saludo.toLowerCase()) as [string, ...string[]];
 
 const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
     .addAction(async (ctx, { state, flowDynamic }) => {
@@ -1032,32 +879,165 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             // Hay un flujo activo, no interrumpir
             return;
         }
-        await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
-                        📢 *Viernes 5 de Diciembre* - *Atención sólo turno tarde*`,
+        
+        try {
+            console.log('=== DEBUG WELCOME FLOW CON HORARIOS ===');
+            console.log('1. Iniciando flujo de bienvenida con horarios');
+            console.log('Mensaje recibido:', ctx.body);
+            
+            const timeZone = 'America/Argentina/Buenos_Aires';
+            const now = new Date();
+            const localChatDate = toZonedTime(now, timeZone);
 
-        );
-        await flowDynamic([
-            'Puedo ayudarte con las siguientes opciones:',
-            '',
-            '📅 Escribe *"turnos"* - Ver horarios disponibles para citas normales',
-            '🏥 Escribe *"sobreturnos"* - Solicitar un sobreturno urgente',
-            '',
-            '💡 *Información importante:*',
-            '• Las citas normales se programan con anticipación',
-            '• Los sobreturnos son para atención el mismo día (sujeto a disponibilidad)',
-            '• Todas las citas se confirman automáticamente',
-            // '',
-            // '¿En qué puedo ayudarte hoy?',
-            // '📢⚠️*Desde 24 de NOVIEMBRE a 01 de DICIEMBRE NO ATIENDE DR. KULINKA* ⚠️'
-        ].join('\n'));
+            const currentHour = parseInt(format(localChatDate, 'HH'), 10);
+            const currentMinute = parseInt(format(localChatDate, 'mm'), 10);
+
+            console.log('2. Hora actual:', `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`);
+
+            const getNextWorkingDay = (date: Date): Date => {
+                const nextDate = new Date(date);
+                nextDate.setHours(0, 0, 0, 0);
+                if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) {
+                    nextDate.setDate(nextDate.getDate() + 1);
+                }
+                while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
+                    nextDate.setDate(nextDate.getDate() + 1);
+                }
+                return nextDate;
+            };
+
+            const appointmentDate = getNextWorkingDay(localChatDate);
+            const formattedDate = format(appointmentDate, 'yyyy-MM-dd');
+            console.log('3. Fecha de cita:', formattedDate);
+
+            // Mensaje de bienvenida
+            await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺`);
+            await flowDynamic('⏳ *Consultando horarios disponibles...*');
+
+            // Obtener las citas reservadas
+            const reservedTimes = await getReservedAppointments(formattedDate);
+            console.log('4. Horarios reservados:', reservedTimes);
+
+            const slotResponse = await fetchAvailableSlots(appointmentDate);
+            const { data } = slotResponse;
+
+            if (data.success) {
+                const fechaFormateada = formatearFechaEspanol(data.data.displayDate);
+                let message = `📅 *Horarios disponibles*\n`;
+                message += `📆 Para el día: *${fechaFormateada}*\n\n`;
+
+                const slots: TimeSlot[] = [];
+                let morningMessage = '';
+                let afternoonMessage = '';
+
+                // Filtrar horarios disponibles
+                const availableMorning = data.data.available.morning
+                    .filter(slot => {
+                        const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
+
+                        if (reservedTimes.includes(slot.displayTime)) {
+                            return false;
+                        }
+
+                        if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
+                            return slot.status === 'available' &&
+                                (slotHour > currentHour ||
+                                    (slotHour === currentHour && slotMinute > currentMinute));
+                        }
+                        return slot.status === 'available';
+                    });
+
+                const availableAfternoon = data.data.available.afternoon
+                    .filter(slot => {
+                        const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
+
+                        if (reservedTimes.includes(slot.displayTime)) {
+                            return false;
+                        }
+
+                        if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
+                            return slot.status === 'available' &&
+                                (slotHour > currentHour ||
+                                    (slotHour === currentHour && slotMinute > currentMinute));
+                        }
+                        return slot.status === 'available';
+                    });
+
+                if (availableMorning.length > 0) {
+                    morningMessage = `*🌅 Horarios de mañana:*\n`;
+                    availableMorning.forEach((slot, index) => {
+                        slots.push(slot);
+                        morningMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
+                    });
+                    message += morningMessage + '\n';
+                }
+
+                if (availableAfternoon.length > 0) {
+                    afternoonMessage = `*🌇 Horarios de tarde:*\n`;
+                    availableAfternoon.forEach((slot, index) => {
+                        slots.push(slot);
+                        afternoonMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
+                    });
+                    message += afternoonMessage;
+                }
+
+                if (slots.length === 0) {
+                    await flowDynamic('❌ Lo siento, no hay horarios disponibles para el día solicitado.');
+                    await flowDynamic('\n🏥 Si necesitas atención urgente, escribe *"sobreturnos"* para solicitar un sobreturno.');
+                    return;
+                }
+
+                await state.update({
+                    availableSlots: slots,
+                    appointmentDate: format(appointmentDate, 'yyyy-MM-dd'),
+                    fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
+                    conversationStartTime: format(localChatDate, 'HH:mm'),
+                });
+
+                message += '\n📝 *Para reservar, responde con el número del horario que deseas*';
+                message += '\n🏥 Si necesitas un sobreturno, escribe *"sobreturnos"*';
+                message += '\n❌ Para cancelar, escribe *"cancelar"*';
+
+                await flowDynamic(message);
+            } else {
+                await flowDynamic('Lo siento, hubo un problema al obtener los horarios disponibles.');
+                await flowDynamic('\n🏥 Si necesitas atención urgente, escribe *"sobreturnos"*');
+            }
+        } catch (error) {
+            console.error('Error al procesar la bienvenida:', error);
+            await flowDynamic('Lo siento, ocurrió un error al consultar los horarios. Por favor, intenta nuevamente más tarde.');
+        }
+    })
+    .addAnswer('', { capture: true }, async (ctx, { gotoFlow, flowDynamic, state }) => {
+        if (ctx.body.toLowerCase() === 'cancelar') {
+            await flowDynamic(`❌ *Reserva cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!`);
+            return gotoFlow(goodbyeFlow);
+        }
+
+        const selectedSlotNumber = parseInt(ctx.body);
+        const availableSlots = state.get('availableSlots');
+
+        if (isNaN(selectedSlotNumber) || selectedSlotNumber < 1 || selectedSlotNumber > availableSlots.length) {
+            await flowDynamic('Número de horario inválido. Por favor, intenta nuevamente.');
+            return;
+        }
+
+        const selectedSlot = availableSlots[selectedSlotNumber - 1];
+        await state.update({ selectedSlot: selectedSlot });
+
+        console.log('=== DEBUG ESTADO ANTES DE DIRIGIR A BOOK APPOINTMENT ===');
+        console.log('selectedSlot guardado:', selectedSlot);
+        console.log('appointmentDate:', state.get('appointmentDate'));
+
+        // Dirigir al flujo de recopilación de datos del cliente
+        return gotoFlow(clientDataFlow);
     });
 
 const main = async () => {
     const adapterFlow = createFlow([
         // Flujos principales
-        welcomeFlow,
+        welcomeFlow,         // Se activa con saludos y muestra horarios automáticamente
         bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
-        availableSlotsFlow,  // Se activa con "horarios", "disponibles", "turnos", "horario"
         clientDataFlow,
         goodbyeFlow,
         adminFlow
