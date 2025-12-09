@@ -44,6 +44,7 @@ interface APIResponseWrapper {
 }
 
 const API_URL = 'https://micitamedica.me/api';
+const CHATBOT_API_KEY = process.env.CHATBOT_API_KEY || '';
 console.log('API URL configuradaa:', API_URL);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -349,7 +350,8 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                             const validateResponse = await fetch(`${API_URL}/sobreturnos/validate/${numero}`, {
                                 method: 'GET',
                                 headers: {
-                                    'Content-Type': 'application/json'
+                                    'Content-Type': 'application/json',
+                                    'X-API-Key': CHATBOT_API_KEY
                                 }
                             });
 
@@ -363,7 +365,8 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                             const fallbackResponse = await fetch(`${API_URL}/sobreturnos/validate?date=${formattedDate}&sobreturnoNumber=${numero}`, {
                                 method: 'GET',
                                 headers: {
-                                    'Content-Type': 'application/json'
+                                    'Content-Type': 'application/json',
+                                    'X-API-Key': CHATBOT_API_KEY
                                 }
                             });
 
@@ -573,13 +576,20 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                         await fetch(`${API_URL}/sobreturnos/cache/clear`, {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json'
+                                'Content-Type': 'application/json',
+                                'X-API-Key': CHATBOT_API_KEY
                             },
                             body: JSON.stringify({ date: appointmentDate })
                         });
 
                         // Obtener estado actualizado
-                        const response = await fetch(`${API_URL}/sobreturnos/available/${appointmentDate}`);
+                        const response = await fetch(`${API_URL}/sobreturnos/available/${appointmentDate}`, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-API-Key': CHATBOT_API_KEY
+                            }
+                        });
                         if (!response.ok) {
                             throw new Error('Error al obtener estado actualizado');
                         }
@@ -616,7 +626,8 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                         const response = await fetch(`${API_URL}/sobreturnos`, {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json'
+                                'Content-Type': 'application/json',
+                                'X-API-Key': CHATBOT_API_KEY
                             },
                             body: JSON.stringify(sobreturnoData)
                         });
@@ -642,7 +653,8 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                                 await fetch(`${API_URL}/sobreturnos/cache/clear`, {
                                     method: 'POST',
                                     headers: {
-                                        'Content-Type': 'application/json'
+                                        'Content-Type': 'application/json',
+                                        'X-API-Key': CHATBOT_API_KEY
                                     },
                                     body: JSON.stringify({ date: appointmentDate })
                                 }).catch(e => console.log('Error al limpiar caché, continuando...'));
@@ -1045,7 +1057,7 @@ const main = async () => {
 
     console.log('🔧 Creando adapter del provider (WhatsApp)...');
     const adapterProvider = createProvider(Provider, {
-        version: [2, 3000, 1027934701] as any
+        version: [2, 3000, 1030794337] as any
     })
     console.log('✅ Adapter del provider creado');
     // const adapterProvider = createProvider(Provider)

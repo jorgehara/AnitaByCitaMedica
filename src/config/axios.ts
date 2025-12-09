@@ -2,6 +2,7 @@ import axios from 'axios';
 import { APP_CONFIG } from './app';
 
 const API_URL = APP_CONFIG.API_URL;
+const CHATBOT_API_KEY = process.env.CHATBOT_API_KEY || '';
 
 // Configuración global de axios
 const axiosInstance = axios.create({
@@ -10,6 +11,7 @@ const axiosInstance = axios.create({
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'X-API-Key': CHATBOT_API_KEY, // API Key para autenticación con el backend
     },
     maxRedirects: 5,
     validateStatus: function (status) {
