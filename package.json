@@ -19,7 +19,7 @@
   "dependencies": {
     "@builderbot/bot": "1.3.14",
     "@builderbot/provider-baileys": "1.3.14",
-    "@builderbot/database-mongo": "1.2.9",
+    "@builderbot/database-mongo": "1.3.14",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^17.2.1",

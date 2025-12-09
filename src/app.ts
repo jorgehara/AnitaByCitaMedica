@@ -8,6 +8,19 @@ import { es } from 'date-fns/locale'
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Manejadores de errores globales
+process.on('uncaughtException', (error) => {
+    console.error('\n❌ ❌ ❌ UNCAUGHT EXCEPTION ❌ ❌ ❌');
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
+});
+
+process.on('unhandledRejection', (reason: any, promise) => {
+    console.error('\n❌ ❌ ❌ UNHANDLED REJECTION ❌ ❌ ❌');
+    console.error('Reason:', reason);
+    console.error('Promise:', promise);
+});
+
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -1028,20 +1041,27 @@ const main = async () => {
         adminFlow
     ])
 
+    console.log('🔧 Creando adapter del provider (WhatsApp)...');
     const adapterProvider = createProvider(Provider, {
-        version: [2, 3000, 1025190524] as any
+        version: [2, 3000, 1027934701] as any
     })
+    console.log('✅ Adapter del provider creado');
     // const adapterProvider = createProvider(Provider)
+
+    console.log('🔧 Conectando a MongoDB...');
     const adapterDB = new Database({
         dbUri: APP_CONFIG.MONGO_DB_URI,
         dbName: APP_CONFIG.MONGO_DB_NAME,
     })
+    console.log('✅ MongoDB conectado');
 
+    console.log('🔧 Creando bot...');
     const { handleCtx, httpServer } = await createBot({
         flow: adapterFlow,
         provider: adapterProvider,
         database: adapterDB,
     })
+    console.log('✅ Bot creado exitosamente');
 
     adapterProvider.server.post(
         '/v1/messages',
@@ -1082,7 +1102,16 @@ const main = async () => {
         })
     )
 
+    console.log('🚀 Iniciando servidor HTTP en puerto:', PORT);
     httpServer(+PORT)
+    console.log('✅ Servidor HTTP iniciado correctamente');
 }
 
-main();
+console.log('📝 Llamando a la función main()...');
+main().then(() => {
+    console.log('✅ main() completada exitosamente');
+}).catch((error) => {
+    console.error('❌ Error en main():', error);
+    console.error('Stack:', error.stack);
+    process.exit(1);
+});
