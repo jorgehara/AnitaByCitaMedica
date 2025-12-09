@@ -1007,7 +1007,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                 });
 
                 message += '\n📝 *Para reservar, responde con el número del horario que deseas*';
-                message += '\n🏥 Si necesitas un sobreturno, escribe *"sobreturnos"*';
+                // message += '\n🏥 Si necesitas un sobreturno, escribe *"sobreturnos"*';
                 message += '\n❌ Para cancelar, escribe *"cancelar"*';
 
                 await flowDynamic(message);
