@@ -1175,7 +1175,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
         const availableSlots = state.get('availableSlots');
 
         if (isNaN(selectedSlotNumber) || selectedSlotNumber < 1 || selectedSlotNumber > availableSlots.length) {
-            await flowDynamic('Número de horario inválido. Por favor, intenta nuevamente.\n en caso que no puedas realizarlo con el chatbot,\n_lo puedes hacer de forma_ _manual escribiendo la palabra:_ "*link*"');
+            await flowDynamic('Número de horario inválido. Por favor, intenta nuevamente.\n *** en caso que no puedas realizarlo con el chatbot,\n_lo puedes hacer de forma_ _manual escribiendo la palabra:_ "*link*" , de esta manera no emite ticket de confirmación, pero notará que el horario que usted solicitó no se encuentra en la lista de horarios disponibles***');
             return;
         }
 
@@ -1302,6 +1302,64 @@ const main = async () => {
 
             res.writeHead(200, { 'Content-Type': 'application/json' })
             return res.end(JSON.stringify({ status: 'ok', number, intent }))
+        })
+    )
+
+    // Endpoint para recibir notificaciones de citas desde la web pública
+    adapterProvider.server.post(
+        '/api/notify-appointment',
+        handleCtx(async (bot, req, res) => {
+            try {
+                const { appointment } = req.body;
+                console.log('[NOTIFICACIÓN] Cita recibida desde web pública:', appointment);
+
+                if (!appointment || !appointment.phone) {
+                    console.error('[NOTIFICACIÓN ERROR] Datos de cita inválidos');
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify({ success: false, message: 'Datos inválidos' }));
+                }
+
+                // Formatear el número de teléfono (asumiendo formato argentino)
+                let phoneNumber = appointment.phone.replace(/\D/g, ''); // Remover todo excepto números
+                if (!phoneNumber.startsWith('54')) {
+                    // Si no tiene código de país, agregarlo
+                    if (phoneNumber.startsWith('9')) {
+                        phoneNumber = '54' + phoneNumber; // Agregar código de país
+                    } else {
+                        phoneNumber = '549' + phoneNumber; // Agregar código de país y 9
+                    }
+                }
+                phoneNumber = phoneNumber + '@s.whatsapp.net';
+
+                // Formatear la fecha en español
+                const [year, month, day] = appointment.date.split('-');
+                const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                const fechaFormateada = format(dateObj, "EEEE d 'de' MMMM 'de' yyyy", { locale: es });
+
+                // Crear mensaje de confirmación
+                const mensaje = `✅ *TURNO CONFIRMADO*\n\n` +
+                    `Hola ${appointment.clientName},\n\n` +
+                    `Tu turno ha sido agendado exitosamente:\n\n` +
+                    `📅 *Fecha:* ${fechaFormateada}\n` +
+                    `🕐 *Hora:* ${appointment.time}\n` +
+                    `🏥 *Obra Social:* ${appointment.socialWork}\n\n` +
+                    `📍 *Dirección:* Av. España 1081 Sur, Godoy Cruz, Mendoza\n\n` +
+                    `⚠️ *Importante:*\n` +
+                    `• Por favor, llega 10 minutos antes de tu turno\n` +
+                    `• Si necesitas cancelar o reprogramar, comunícate lo antes posible\n\n` +
+                    `¡Te esperamos! 🩺`;
+
+                // Enviar mensaje por WhatsApp
+                await bot.sendMessage(phoneNumber, mensaje, {});
+                console.log('[NOTIFICACIÓN] Mensaje de confirmación enviado a:', phoneNumber);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: true, message: 'Notificación enviada' }));
+            } catch (error: any) {
+                console.error('[NOTIFICACIÓN ERROR] Error al enviar notificación:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: false, message: error.message }));
+            }
         })
     )
 
