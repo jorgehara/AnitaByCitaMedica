@@ -924,7 +924,6 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
             // Mensaje de bienvenida
             await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺`);
-            await flowDynamic('⏳ *Consultando horarios disponibles...*');
 
             // Obtener las citas reservadas
             const reservedTimes = await getReservedAppointments(formattedDate);
@@ -1021,6 +1020,152 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
         }
     })
     .addAnswer('', { capture: true }, async (ctx, { gotoFlow, flowDynamic, state }) => {
+        // Verificar si estamos esperando la opción de agendamiento
+        const waitingForBookingOption = state.get('waitingForBookingOption');
+        
+        if (waitingForBookingOption) {
+            const option = ctx.body.trim();
+            
+            if (option === '1') {
+                // Continuar con agendamiento por WhatsApp
+                await state.update({ waitingForBookingOption: false });
+                await flowDynamic('⏳ *Consultando horarios disponibles...*');
+                
+                // Aquí va la lógica de mostrar horarios
+                const timeZone = 'America/Argentina/Buenos_Aires';
+                const now = new Date();
+                const localChatDate = toZonedTime(now, timeZone);
+                
+                const currentHour = parseInt(format(localChatDate, 'HH'), 10);
+                const currentMinute = parseInt(format(localChatDate, 'mm'), 10);
+                
+                const getNextWorkingDay = (date: Date): Date => {
+                    const nextDate = new Date(date);
+                    nextDate.setHours(0, 0, 0, 0);
+                    if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) {
+                        nextDate.setDate(nextDate.getDate() + 1);
+                    }
+                    while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
+                        nextDate.setDate(nextDate.getDate() + 1);
+                    }
+                    return nextDate;
+                };
+                
+                const appointmentDate = getNextWorkingDay(localChatDate);
+                const formattedDate = format(appointmentDate, 'yyyy-MM-dd');
+                
+                // Obtener las citas reservadas
+                const reservedTimes = await getReservedAppointments(formattedDate);
+                
+                const slotResponse = await fetchAvailableSlots(appointmentDate);
+                const { data } = slotResponse;
+                
+                if (data.success) {
+                    const fechaFormateada = formatearFechaEspanol(data.data.displayDate);
+                    let message = `📅 *Horarios disponibles*\n`;
+                    message += `📆 Para el día: *${fechaFormateada}*\n\n`;
+                    
+                    const slots: TimeSlot[] = [];
+                    let morningMessage = '';
+                    let afternoonMessage = '';
+                    
+                    // Filtrar horarios disponibles
+                    const availableMorning = data.data.available.morning
+                        .filter(slot => {
+                            const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
+                            
+                            if (reservedTimes.includes(slot.displayTime)) {
+                                return false;
+                            }
+                            
+                            if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
+                                return slot.status === 'available' &&
+                                    (slotHour > currentHour ||
+                                        (slotHour === currentHour && slotMinute > currentMinute));
+                            }
+                            return slot.status === 'available';
+                        });
+                    
+                    const availableAfternoon = data.data.available.afternoon
+                        .filter(slot => {
+                            const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
+                            
+                            if (reservedTimes.includes(slot.displayTime)) {
+                                return false;
+                            }
+                            
+                            if (format(appointmentDate, 'yyyy-MM-dd') === format(localChatDate, 'yyyy-MM-dd')) {
+                                return slot.status === 'available' &&
+                                    (slotHour > currentHour ||
+                                        (slotHour === currentHour && slotMinute > currentMinute));
+                            }
+                            return slot.status === 'available';
+                        });
+                    
+                    if (availableMorning.length > 0) {
+                        morningMessage = `*🌅 Horarios de mañana:*\n`;
+                        availableMorning.forEach((slot, index) => {
+                            slots.push(slot);
+                            morningMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
+                        });
+                        message += morningMessage + '\n';
+                    }
+                    
+                    if (availableAfternoon.length > 0) {
+                        afternoonMessage = `*🌇 Horarios de tarde:*\n`;
+                        availableAfternoon.forEach((slot, index) => {
+                            slots.push(slot);
+                            afternoonMessage += `${slots.length}. ⏰ ${slot.displayTime}\n`;
+                        });
+                        message += afternoonMessage;
+                    }
+                    
+                    if (slots.length === 0) {
+                        await flowDynamic('❌ Lo siento, no hay horarios disponibles para el día solicitado.');
+                        await flowDynamic('\n🏥 Si necesitas atención urgente, escribe *"sobreturnos"* para solicitar un sobreturno.');
+                        return;
+                    }
+                    
+                    await state.update({
+                        availableSlots: slots,
+                        appointmentDate: format(appointmentDate, 'yyyy-MM-dd'),
+                        fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
+                        conversationStartTime: format(localChatDate, 'HH:mm'),
+                    });
+                    
+                    message += '\n📝 *Para reservar, responde con el número del horario que deseas*';
+                    message += '\n❌ Para cancelar, escribe *"cancelar"*';
+                    
+                    await flowDynamic(message);
+                } else {
+                    await flowDynamic('Lo siento, hubo un problema al obtener los horarios disponibles.');
+                    await flowDynamic('\n🏥 Si necesitas atención urgente, escribe *"sobreturnos"*');
+                }
+                return;
+                
+            } else if (option === '2') {
+                // Enviar enlace web
+                await state.update({ waitingForBookingOption: false });
+                await flowDynamic(
+                    '🌐 *Agendamiento por Web*\n\n' +
+                    'Puedes agendar tu turno desde nuestro sitio web:\n\n' +
+                    '🔗 https://micitamedica.me/agendar-turno\n\n' +
+                    '✨ *Ventajas:*\n' +
+                    '• Selecciona fecha y horario\n' +
+                    '• Completa tus datos\n' +
+                    '• Confirmación inmediata\n\n' +
+                    '📱 *Solo tienes que hacer click en el enlace*'
+                );
+                await state.clear();
+                return gotoFlow(goodbyeFlow);
+                
+            } else {
+                await flowDynamic('❌ Opción inválida. Por favor, responde con *1* para WhatsApp o *2* para Web.');
+                return;
+            }
+        }
+        
+        // Lógica original de selección de horario
         if (ctx.body.toLowerCase() === 'cancelar') {
             await flowDynamic(`❌ *Reserva cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!`);
             return gotoFlow(goodbyeFlow);
@@ -1045,11 +1190,55 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
         return gotoFlow(clientDataFlow);
     });
 
+// Flujo para generar enlace de reserva pública
+export const publicBookingLinkFlow = addKeyword(['bazinga', 'link', 'enlace'])
+    .addAction(async (ctx, { flowDynamic }) => {
+        try {
+            console.log('[PUBLIC LINK] Generando token temporal...');
+
+            // Generar token temporal
+            const response = await axiosInstance.post('/tokens/generate-public-token', {}, {
+                headers: {
+                    'X-API-Key': CHATBOT_API_KEY
+                }
+            });
+
+            if (response.data.success && response.data.data.token) {
+                const token = response.data.data.token;
+                const expiresAt = response.data.data.expiresAt;
+
+                // Crear URL con el token
+                const bookingUrl = `https://micitamedica.me/reservar-turno?token=${token}`;
+
+                console.log('[PUBLIC LINK] Token generado exitosamente');
+                console.log('[PUBLIC LINK] URL:', bookingUrl);
+
+                await flowDynamic(
+                    `🔗 *ENLACE DE RESERVA GENERADO*\n\n` +
+                    `Aquí está tu enlace personalizado para agendar una cita:\n\n` +
+                    `${bookingUrl}\n\n` +
+                    `⏰ *Este enlace es válido por 7 horas*\n` +
+                    `📅 Expira: ${new Date(expiresAt).toLocaleString('es-AR')}\n\n` +
+                    `Simplemente haz clic en el enlace para completar tu reserva en el navegador.`
+                );
+            } else {
+                throw new Error('No se pudo generar el token');
+            }
+        } catch (error: any) {
+            console.error('[PUBLIC LINK ERROR]:', error);
+            await flowDynamic(
+                `❌ *Error al generar el enlace*\n\n` +
+                `No pude crear tu enlace de reserva. Por favor, intenta nuevamente o contacta al Dr. Kulinka.`
+            );
+        }
+    });
+
 const main = async () => {
     const adapterFlow = createFlow([
         // Flujos principales
         welcomeFlow,         // Se activa con saludos y muestra horarios automáticamente
         bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
+        publicBookingLinkFlow, // Se activa con "bazinga", "link", "enlace"
         clientDataFlow,
         goodbyeFlow,
         adminFlow
