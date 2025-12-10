@@ -1175,7 +1175,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
         const availableSlots = state.get('availableSlots');
 
         if (isNaN(selectedSlotNumber) || selectedSlotNumber < 1 || selectedSlotNumber > availableSlots.length) {
-            await flowDynamic('Número de horario inválido. Por favor, intenta nuevamente.');
+            await flowDynamic('Número de horario inválido. Por favor, intenta nuevamente.\n en caso que no puedas realizarlo con el chatbot,\n_lo puedes hacer de forma_ _manual escribiendo la palabra:_ "*link*"');
             return;
         }
 
@@ -1217,9 +1217,9 @@ export const publicBookingLinkFlow = addKeyword(['bazinga', 'link', 'enlace'])
                     `🔗 *ENLACE DE RESERVA GENERADO*\n\n` +
                     `Aquí está tu enlace personalizado para agendar una cita:\n\n` +
                     `${bookingUrl}\n\n` +
-                    `⏰ *Este enlace es válido por 7 horas*\n` +
-                    `📅 Expira: ${new Date(expiresAt).toLocaleString('es-AR')}\n\n` +
-                    `Simplemente haz clic en el enlace para completar tu reserva en el navegador.`
+                    // `⏰ *Este enlace es válido por 7 horas*\n` +
+                    // `📅 Expira: ${new Date(expiresAt).toLocaleString('es-AR')}\n\n` +
+                    `Simplemente haz clic en el enlace ☝️ para completar tu reserva.`
                 );
             } else {
                 throw new Error('No se pudo generar el token');
