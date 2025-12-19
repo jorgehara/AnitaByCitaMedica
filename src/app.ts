@@ -1345,7 +1345,7 @@ const main = async () => {
                     `🏥 *Obra Social:* ${appointment.socialWork}\n\n` +
                     `📍 *Dirección:* Av. España 1081 Sur, Godoy Cruz, Mendoza\n\n` +
                     `⚠️ *Importante:*\n` +
-                    `• Por favor, llega 10 minutos antes de tu turno\n` +
+                    `• Por favor, llega *30 minutos* antes de tu turno\n` +
                     `• Si necesitas cancelar o reprogramar, comunícate lo antes posible\n\n` +
                     `¡Te esperamos! 🩺`;
 
