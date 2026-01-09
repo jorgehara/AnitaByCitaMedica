@@ -35,7 +35,7 @@ export const APP_CONFIG = {
         SUCCESS: '✅ Tu cita ha sido agendada exitosamente.',
         INSTRUCTIONS: [
             '📋 *Instrucciones importantes:*',
-            '- Llegue 10 minutos antes de su cita',
+            '- Llegue 30 minutos antes de su cita',
             '- Traiga su documento de identidad',
             '- Traiga su carnet de obra social'
         ].join('\n')

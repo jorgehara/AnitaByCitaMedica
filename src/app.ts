@@ -674,7 +674,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                                 `📞 *Teléfono:* ${phone}\n` +
                                 `🏥 *Obra Social:* ${socialWork}\n\n` +
                                 `⚠️ *IMPORTANTE:*\n` +
-                                `• Llegue 10 minutos antes\n` +
+                                `• Llegue 30 minutos antes\n` +
                                 `• Traiga documento de identidad\n` +
                                 `• Traiga carnet de obra social\n` +
                                 `• *El sobreturno depende de la disponibilidad del médico*\n\n` +
@@ -803,7 +803,7 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
                     `📞 *Teléfono:* ${data.data.phone}\n` +
                     `🏥 *Obra Social:* ${data.data.socialWork}\n\n` +
                     `ℹ️ *Información importante:*\n` +
-                    `- Por favor, llegue 10 minutos antes de su cita\n` +
+                    `- Por favor, llegue 30 minutos antes de su cita\n` +
                     `- Traiga su documento de identidad\n` +
                     `- Traiga su carnet de obra social\n\n` +
                     `📌 *Para cambios o cancelaciones:*\n` +

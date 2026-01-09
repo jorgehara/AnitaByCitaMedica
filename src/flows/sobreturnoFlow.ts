@@ -238,7 +238,7 @@ export const bookSobreturnoFlow = addKeyword<Provider, IDBDatabase>(['sobreturno
                     `🕒 Hora: ${selectedSobreturno.time} hs\n` +
                     `👤 Paciente: ${clientName}\n` +
                     `🏥 Obra Social: ${socialWork}\n\n` +
-                    `ℹ️ Te esperamos en el consultorio 10 minutos antes.`;
+                    `ℹ️ Te esperamos en el consultorio 30 minutos antes.`;
 
                 await flowDynamic(confirmMessage);
                 await state.clear();

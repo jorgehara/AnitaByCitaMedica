@@ -227,7 +227,7 @@ export const appointmentFlow = addKeyword(['turnos'])
                     `📞 *Teléfono:* ${response.data.data.phone}`,
                     `🏥 *Obra Social:* ${response.data.data.socialWork}\n`,
                     'ℹ️ *Información importante:*',
-                    '- Por favor, llegue 10 minutos antes de su cita',
+                    '- Por favor, llegue 30 minutos antes de su cita',
                     '- Traiga su documento de identidad',
                     '- Traiga su carnet de obra social\n',
                     '📌 *Para cambios o cancelaciones:*',
