@@ -1246,7 +1246,7 @@ const main = async () => {
 
     console.log('🔧 Creando adapter del provider (WhatsApp)...');
     const adapterProvider = createProvider(Provider, {
-        version: [2, 3000, 1030794337] as any
+        version: [2, 3000, 1031788782] as any
     })
     console.log('✅ Adapter del provider creado');
     // const adapterProvider = createProvider(Provider)
