@@ -1005,7 +1005,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                     conversationStartTime: format(localChatDate, 'HH:mm'),
                 });
 
-                message += '\n📝 *Para reservar, responde con el número del horario que deseas*';
+                message += '\n📝 *Para reservar, responde con el número del horario que deseas*\n ℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*';
                 // message += '\n🏥 Si necesitas un sobreturno, escribe *"sobreturnos"*';
                 message += '\n❌ Para cancelar, escribe *"cancelar"*';
 
@@ -1133,7 +1133,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                         conversationStartTime: format(localChatDate, 'HH:mm'),
                     });
                     
-                    message += '\n📝 *Para reservar, responde con el número del horario que deseas*';
+                    message += '\n📝 *Para reservar, responde con el número del horario que deseas*\n ℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*';
                     message += '\n❌ Para cancelar, escribe *"cancelar"*';
                     
                     await flowDynamic(message);
