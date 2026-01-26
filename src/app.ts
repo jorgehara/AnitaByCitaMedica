@@ -1249,6 +1249,7 @@ const main = async () => {
         welcomeFlow,         // Se activa con saludos y muestra horarios automáticamente
         //bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
         publicBookingLinkFlow, // Se activa con "bazinga", "link", "enlace"
+        sobreTurnosTemporario,
         clientDataFlow,
         goodbyeFlow,
         adminFlow
