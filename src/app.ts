@@ -203,6 +203,16 @@ async function createAppointment(appointmentData: AppointmentData): Promise<APIR
 
 
 //Flujo de sobreturnos - SOLO se activa con la palabra "sobreturnos"
+export const sobreTurnosTemporario = addKeyword(['sobreturnos', 'sobreturno', 'Sobreturnos', 'Sobreturno'])
+    .addAnswer(
+`🏥 *SOLICITUD DE SOBRETURNOS*
+¡Gracias por comunicarte con nosotros!
+Para gestionar tu *sobreturno*, te pedimos por favor que te comuniques telefónicamente.
+
+ℹ️ *Para sobreturnos, llamá al:* *3735604949*`)
+
+
+//Flujo de sobreturnos - SOLO se activa con la palabra "sobreturnos"
 export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobreturnos', 'Sobreturno'])
     .addAnswer(
         '🏥 *SOLICITUD DE SOBRETURNOS*\n\n' +
@@ -1237,7 +1247,7 @@ const main = async () => {
     const adapterFlow = createFlow([
         // Flujos principales
         welcomeFlow,         // Se activa con saludos y muestra horarios automáticamente
-        bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
+        //bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
         publicBookingLinkFlow, // Se activa con "bazinga", "link", "enlace"
         clientDataFlow,
         goodbyeFlow,
