@@ -204,19 +204,75 @@ async function createAppointment(appointmentData: AppointmentData): Promise<APIR
 
 //Flujo de sobreturnos - SOLO se activa con la palabra "sobreturnos"
 export const sobreTurnosTemporario = addKeyword(['sobreturnos', 'sobreturno', 'Sobreturnos', 'Sobreturno'])
-    .addAnswer(
-`🏥 *SOLICITUD DE SOBRETURNOS*
-¡Gracias por comunicarte con nosotros!
+    .addAction(async (ctx, { flowDynamic }) => {
+        try {
+            const timeZone = 'America/Argentina/Buenos_Aires';
+            const now = new Date();
+            const localDate = toZonedTime(now, timeZone);
+            const todayFormatted = format(localDate, 'yyyy-MM-dd');
 
-📱 *Opciones para solicitar un sobreturno:*
+            console.log('[SOBRETURNOS] Consultando sobreturnos para HOY:', todayFormatted);
 
-1️⃣ *Por teléfono:*
-   📞 Llamá al: *3735604949*
+            // Consultar sobreturnos disponibles de HOY
+            const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${todayFormatted}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': CHATBOT_API_KEY
+                }
+            });
 
-2️⃣ *Por la web:*
-   🌐 Ingresá a: https://micitamedica.me/sobreturnos
+            const sobreturnosData = await sobreturnosResponse.json();
+            const disponiblesHoy = sobreturnosData.success ? sobreturnosData.data.disponibles.length : 0;
 
-💡 *El chatbot también puede ayudarte* - Si no hay turnos normales disponibles, automáticamente te ofrecerá los sobreturnos.`)
+            // Generar token público para la web
+            let bookingUrl = 'https://micitamedica.me/agendar-turno';
+            try {
+                const tokenResponse = await axiosInstance.post('/tokens/generate-public-token', {}, {
+                    headers: {
+                        'X-API-Key': CHATBOT_API_KEY
+                    }
+                });
+
+                if (tokenResponse.data.success && tokenResponse.data.data.token) {
+                    const token = tokenResponse.data.data.token;
+                    bookingUrl = `https://micitamedica.me/reservar-turno?token=${token}`;
+                    console.log('[SOBRETURNOS] Token generado para URL:', bookingUrl);
+                }
+            } catch (tokenError) {
+                console.error('[SOBRETURNOS] Error al generar token:', tokenError);
+            }
+
+            let message = `🏥 *SOLICITUD DE SOBRETURNOS*\n`;
+            message += `¡Gracias por comunicarte con nosotros!\n\n`;
+
+            if (disponiblesHoy > 0) {
+                message += `✅ *Hay ${disponiblesHoy} sobreturnos disponibles HOY*\n\n`;
+            } else {
+                message += `⚠️ *No hay sobreturnos disponibles HOY*\n\n`;
+            }
+
+            message += `📱 *Opciones para solicitar un sobreturno:*\n\n`;
+            message += `1️⃣ *Por teléfono:*\n`;
+            message += `   📞 Llamá al: *3735604949*\n\n`;
+            message += `2️⃣ *Por la web:*\n`;
+            message += `   🌐 ${bookingUrl}\n\n`;
+            message += `💡 *El chatbot también puede ayudarte* - Si no hay turnos normales disponibles, automáticamente te ofrecerá los sobreturnos.`;
+
+            await flowDynamic(message);
+
+        } catch (error) {
+            console.error('[SOBRETURNOS ERROR]:', error);
+            await flowDynamic(
+                `🏥 *SOLICITUD DE SOBRETURNOS*\n` +
+                `¡Gracias por comunicarte con nosotros!\n\n` +
+                `📱 *Opciones para solicitar un sobreturno:*\n\n` +
+                `1️⃣ *Por teléfono:*\n` +
+                `   📞 Llamá al: *3735604949*\n\n` +
+                `2️⃣ *Por la web:*\n` +
+                `   🌐 https://micitamedica.me/agendar-turno`
+            );
+        }
+    })
 
 
 //Flujo de sobreturnos - SOLO se activa con la palabra "sobreturnos"
@@ -1071,12 +1127,14 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                 }
 
                 if (slots.length === 0) {
-                    // No hay turnos normales, consultar sobreturnos disponibles
+                    // No hay turnos normales, consultar sobreturnos disponibles de HOY
                     await flowDynamic('❌ No hay turnos normales disponibles para este día.');
-                    await flowDynamic('⏳ *Consultando sobreturnos disponibles...*');
+                    await flowDynamic('⏳ *Consultando sobreturnos disponibles para HOY...*');
 
                     try {
-                        const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${formattedDate}`, {
+                        // Consultar sobreturnos de HOY (no del próximo día hábil)
+                        const todayFormatted = format(localChatDate, 'yyyy-MM-dd');
+                        const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${todayFormatted}`, {
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-API-Key': CHATBOT_API_KEY
@@ -1088,8 +1146,8 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                         if (sobreturnosData.success && sobreturnosData.data.disponibles.length > 0) {
                             const sobreturnos = sobreturnosData.data.disponibles;
 
-                            let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES*\n`;
-                            sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(formattedDate)}*\n\n`;
+                            let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES HOY*\n`;
+                            sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(todayFormatted)}*\n\n`;
 
                             sobreturnos.forEach((st: any) => {
                                 sobreturnoMessage += `${st.numero}. 📌 Sobreturno ${st.numero}\n`;
@@ -1100,7 +1158,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                             await state.update({
                                 availableSobreturnos: sobreturnos,
-                                appointmentDate: formattedDate,
+                                appointmentDate: todayFormatted,
                                 isSobreturnoMode: true,
                                 fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
                                 conversationStartTime: format(localChatDate, 'HH:mm'),
@@ -1108,7 +1166,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                             await flowDynamic(sobreturnoMessage);
                         } else {
-                            await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para este día.');
+                            await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para HOY.');
                             await flowDynamic('📞 Para más información, llamá al *3735604949*');
                         }
                     } catch (error) {
@@ -1242,12 +1300,14 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                     }
                     
                     if (slots.length === 0) {
-                        // No hay turnos normales, consultar sobreturnos disponibles
+                        // No hay turnos normales, consultar sobreturnos disponibles de HOY
                         await flowDynamic('❌ No hay turnos normales disponibles para este día.');
-                        await flowDynamic('⏳ *Consultando sobreturnos disponibles...*');
+                        await flowDynamic('⏳ *Consultando sobreturnos disponibles para HOY...*');
 
                         try {
-                            const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${formattedDate}`, {
+                            // Consultar sobreturnos de HOY (no del próximo día hábil)
+                            const todayFormatted = format(localChatDate, 'yyyy-MM-dd');
+                            const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${todayFormatted}`, {
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'X-API-Key': CHATBOT_API_KEY
@@ -1259,8 +1319,8 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                             if (sobreturnosData.success && sobreturnosData.data.disponibles.length > 0) {
                                 const sobreturnos = sobreturnosData.data.disponibles;
 
-                                let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES*\n`;
-                                sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(formattedDate)}*\n\n`;
+                                let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES HOY*\n`;
+                                sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(todayFormatted)}*\n\n`;
 
                                 sobreturnos.forEach((st: any) => {
                                     sobreturnoMessage += `${st.numero}. 📌 Sobreturno ${st.numero}\n`;
@@ -1271,7 +1331,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                                 await state.update({
                                     availableSobreturnos: sobreturnos,
-                                    appointmentDate: formattedDate,
+                                    appointmentDate: todayFormatted,
                                     isSobreturnoMode: true,
                                     fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
                                     conversationStartTime: format(localChatDate, 'HH:mm'),
@@ -1279,7 +1339,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                                 await flowDynamic(sobreturnoMessage);
                             } else {
-                                await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para este día.');
+                                await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para HOY.');
                                 await flowDynamic('📞 Para más información, llamá al *3735604949*');
                             }
                         } catch (error) {
