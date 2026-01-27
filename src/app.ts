@@ -1076,7 +1076,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             console.log('3. Fecha de cita:', formattedDate);
 
             // Mensaje de bienvenida
-            await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺`);
+            await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺 \n\n ‼️*EL DIA MIERCOLES 28 DE ENERO NO ATIENDE POR LA TARDE ‼️*\n\n`);
 
             // Obtener las citas reservadas
             const reservedTimes = await getReservedAppointments(formattedDate);
