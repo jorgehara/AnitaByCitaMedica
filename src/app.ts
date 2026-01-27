@@ -207,9 +207,16 @@ export const sobreTurnosTemporario = addKeyword(['sobreturnos', 'sobreturno', 'S
     .addAnswer(
 `🏥 *SOLICITUD DE SOBRETURNOS*
 ¡Gracias por comunicarte con nosotros!
-Para gestionar tu *sobreturno*, te pedimos por favor que te comuniques telefónicamente.
 
-ℹ️ *Para sobreturnos, llamá al:* *3735604949*`)
+📱 *Opciones para solicitar un sobreturno:*
+
+1️⃣ *Por teléfono:*
+   📞 Llamá al: *3735604949*
+
+2️⃣ *Por la web:*
+   🌐 Ingresá a: https://micitamedica.me/sobreturnos
+
+💡 *El chatbot también puede ayudarte* - Si no hay turnos normales disponibles, automáticamente te ofrecerá los sobreturnos.`)
 
 
 //Flujo de sobreturnos - SOLO se activa con la palabra "sobreturnos"
@@ -765,53 +772,69 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
             const clientName = state.get('clientName');
             const socialWork = state.get('socialWork');
             const selectedSlot = state.get('selectedSlot');
+            const selectedSobreturno = state.get('selectedSobreturno');
+            const isSobreturnoMode = state.get('isSobreturnoMode');
             const appointmentDate = state.get('appointmentDate');
             const phone = ctx.from;
 
-            // Validar que todos los datos requeridos están presentes
-            if (!clientName || !socialWork || !selectedSlot || !appointmentDate) {
+            // Determinar si es un sobreturno o turno normal
+            const isCreatingSobreturno = isSobreturnoMode && selectedSobreturno;
+
+            // Validar datos requeridos
+            if (!clientName || !socialWork || !appointmentDate) {
                 console.error('Datos faltantes en el estado:', {
                     clientName,
                     socialWork,
-                    selectedSlot,
                     appointmentDate
                 });
                 await flowDynamic('❌ Hubo un problema con los datos de la cita. Por favor, intenta nuevamente desde el inicio.');
                 return;
             }
 
-            if (!selectedSlot.displayTime) {
-                console.error('selectedSlot no tiene displayTime:', selectedSlot);
-                await flowDynamic('❌ Hubo un problema con el horario seleccionado. Por favor, intenta nuevamente.');
-                return;
-            }
+            if (isCreatingSobreturno) {
+                // CREAR SOBRETURNO
+                if (!selectedSobreturno) {
+                    await flowDynamic('❌ Hubo un problema con el sobreturno seleccionado. Por favor, intenta nuevamente.');
+                    return;
+                }
 
-            const appointmentData: AppointmentData = {
-                clientName,
-                socialWork,
-                phone: phone,
-                date: appointmentDate,
-                time: selectedSlot.displayTime,
-                email: phone + '@phone.com'
-            };
+                const sobreturnoData = {
+                    sobreturnoNumber: selectedSobreturno.numero,
+                    date: appointmentDate,
+                    clientName,
+                    socialWork,
+                    phone,
+                    email: phone + '@phone.com'
+                };
 
-            const result = await createAppointment(appointmentData);
+                console.log('=== CREANDO SOBRETURNO ===');
+                console.log('Datos:', sobreturnoData);
 
-            if (result.error) {
-                await flowDynamic(`❌ ${result.message || 'Hubo un problema al crear la cita. Por favor, intenta nuevamente.'}`);
-                return;
-            }
+                const sobreturnoResponse = await fetch(`${API_URL}/sobreturnos`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': CHATBOT_API_KEY
+                    },
+                    body: JSON.stringify(sobreturnoData)
+                });
 
-            const data = result.data;
-            if (data && data.success) {
-                const fechaFormateada = formatearFechaEspanol(data.data.date);
-                const message = `✨ *CONFIRMACIÓN DE CITA MÉDICA* ✨\n\n` +
-                    `✅ La cita ha sido agendada exitosamente\n\n` +
+                const sobreturnoResult = await sobreturnoResponse.json();
+
+                if (!sobreturnoResponse.ok || sobreturnoResult.error) {
+                    await flowDynamic(`❌ ${sobreturnoResult.error || 'Hubo un problema al crear el sobreturno. Por favor, intenta nuevamente.'}`);
+                    return;
+                }
+
+                const fechaFormateada = formatearFechaEspanol(sobreturnoResult.date);
+                const message = `✨ *CONFIRMACIÓN DE SOBRETURNO* ✨\n\n` +
+                    `✅ El sobreturno ha sido agendado exitosamente\n\n` +
+                    `📌 *Sobreturno:* ${sobreturnoResult.sobreturnoNumber}\n` +
                     `📅 *Fecha:* ${fechaFormateada}\n` +
-                    `🕒 *Hora:* ${data.data.time}\n` +
-                    `👤 *Paciente:* ${data.data.clientName}\n` +
-                    `📞 *Teléfono:* ${data.data.phone}\n` +
-                    `🏥 *Obra Social:* ${data.data.socialWork}\n\n` +
+                    `🕒 *Hora:* ${sobreturnoResult.time}\n` +
+                    `👤 *Paciente:* ${sobreturnoResult.clientName}\n` +
+                    `📞 *Teléfono:* ${sobreturnoResult.phone}\n` +
+                    `🏥 *Obra Social:* ${sobreturnoResult.socialWork}\n\n` +
                     `ℹ️ *Información importante:*\n` +
                     `- Por favor, llegue 30 minutos antes de su cita\n` +
                     `- Traiga su documento de identidad\n` +
@@ -821,8 +844,53 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
                     `*¡Gracias por confiar en nosotros!* 🙏\n` +
                     `----------------------------------`;
                 await flowDynamic(message);
+
             } else {
-                await flowDynamic('❌ Lo siento, hubo un problema al crear la cita. Por favor, intenta nuevamente.');
+                // CREAR TURNO NORMAL
+                if (!selectedSlot || !selectedSlot.displayTime) {
+                    console.error('selectedSlot inválido:', selectedSlot);
+                    await flowDynamic('❌ Hubo un problema con el horario seleccionado. Por favor, intenta nuevamente.');
+                    return;
+                }
+
+                const appointmentData: AppointmentData = {
+                    clientName,
+                    socialWork,
+                    phone: phone,
+                    date: appointmentDate,
+                    time: selectedSlot.displayTime,
+                    email: phone + '@phone.com'
+                };
+
+                const result = await createAppointment(appointmentData);
+
+                if (result.error) {
+                    await flowDynamic(`❌ ${result.message || 'Hubo un problema al crear la cita. Por favor, intenta nuevamente.'}`);
+                    return;
+                }
+
+                const data = result.data;
+                if (data && data.success) {
+                    const fechaFormateada = formatearFechaEspanol(data.data.date);
+                    const message = `✨ *CONFIRMACIÓN DE CITA MÉDICA* ✨\n\n` +
+                        `✅ La cita ha sido agendada exitosamente\n\n` +
+                        `📅 *Fecha:* ${fechaFormateada}\n` +
+                        `🕒 *Hora:* ${data.data.time}\n` +
+                        `👤 *Paciente:* ${data.data.clientName}\n` +
+                        `📞 *Teléfono:* ${data.data.phone}\n` +
+                        `🏥 *Obra Social:* ${data.data.socialWork}\n\n` +
+                        `ℹ️ *Información importante:*\n` +
+                        `- Por favor, llegue 30 minutos antes de su cita\n` +
+                        `- Traiga su documento de identidad\n` +
+                        `- Traiga su carnet de obra social\n\n` +
+                        `📌 *Para cambios o cancelaciones:*\n` +
+                        `Por favor contáctenos con anticipación\n\n` +
+                        `*¡Gracias por confiar en nosotros!* 🙏\n` +
+                        `----------------------------------`;
+                    await flowDynamic(message);
+                } else {
+                    await flowDynamic('❌ Lo siento, hubo un problema al crear la cita. Por favor, intenta nuevamente.');
+                }
             }
         } catch (error) {
             console.error('Error al crear la cita:', error);
@@ -1003,8 +1071,51 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                 }
 
                 if (slots.length === 0) {
-                    await flowDynamic('❌ Lo siento, no hay horarios disponibles para el día solicitado.');
-                    await flowDynamic('\n🏥 Si necesitas atención urgente, escribe *"sobreturnos"* para solicitar un sobreturno.');
+                    // No hay turnos normales, consultar sobreturnos disponibles
+                    await flowDynamic('❌ No hay turnos normales disponibles para este día.');
+                    await flowDynamic('⏳ *Consultando sobreturnos disponibles...*');
+
+                    try {
+                        const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${formattedDate}`, {
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-API-Key': CHATBOT_API_KEY
+                            }
+                        });
+
+                        const sobreturnosData = await sobreturnosResponse.json();
+
+                        if (sobreturnosData.success && sobreturnosData.data.disponibles.length > 0) {
+                            const sobreturnos = sobreturnosData.data.disponibles;
+
+                            let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES*\n`;
+                            sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(formattedDate)}*\n\n`;
+
+                            sobreturnos.forEach((st: any) => {
+                                sobreturnoMessage += `${st.numero}. 📌 Sobreturno ${st.numero}\n`;
+                            });
+
+                            sobreturnoMessage += '\n📝 *Para reservar, responde con el número del sobreturno que deseas*';
+                            sobreturnoMessage += '\n❌ Para cancelar, escribe *"cancelar"*';
+
+                            await state.update({
+                                availableSobreturnos: sobreturnos,
+                                appointmentDate: formattedDate,
+                                isSobreturnoMode: true,
+                                fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
+                                conversationStartTime: format(localChatDate, 'HH:mm'),
+                            });
+
+                            await flowDynamic(sobreturnoMessage);
+                        } else {
+                            await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para este día.');
+                            await flowDynamic('📞 Para más información, llamá al *3735604949*');
+                        }
+                    } catch (error) {
+                        console.error('Error al consultar sobreturnos:', error);
+                        await flowDynamic('❌ Error al consultar sobreturnos.');
+                        await flowDynamic('📞 Por favor, llamá al *3735604949* para más información.');
+                    }
                     return;
                 }
 
@@ -1131,8 +1242,51 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                     }
                     
                     if (slots.length === 0) {
-                        await flowDynamic('❌ Lo siento, no hay horarios disponibles para el día solicitado.');
-                        await flowDynamic('\n🏥 Si necesitas atención urgente, escribe *"sobreturnos"* para solicitar un sobreturno.');
+                        // No hay turnos normales, consultar sobreturnos disponibles
+                        await flowDynamic('❌ No hay turnos normales disponibles para este día.');
+                        await flowDynamic('⏳ *Consultando sobreturnos disponibles...*');
+
+                        try {
+                            const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${formattedDate}`, {
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-API-Key': CHATBOT_API_KEY
+                                }
+                            });
+
+                            const sobreturnosData = await sobreturnosResponse.json();
+
+                            if (sobreturnosData.success && sobreturnosData.data.disponibles.length > 0) {
+                                const sobreturnos = sobreturnosData.data.disponibles;
+
+                                let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES*\n`;
+                                sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(formattedDate)}*\n\n`;
+
+                                sobreturnos.forEach((st: any) => {
+                                    sobreturnoMessage += `${st.numero}. 📌 Sobreturno ${st.numero}\n`;
+                                });
+
+                                sobreturnoMessage += '\n📝 *Para reservar, responde con el número del sobreturno que deseas*';
+                                sobreturnoMessage += '\n❌ Para cancelar, escribe *"cancelar"*';
+
+                                await state.update({
+                                    availableSobreturnos: sobreturnos,
+                                    appointmentDate: formattedDate,
+                                    isSobreturnoMode: true,
+                                    fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
+                                    conversationStartTime: format(localChatDate, 'HH:mm'),
+                                });
+
+                                await flowDynamic(sobreturnoMessage);
+                            } else {
+                                await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para este día.');
+                                await flowDynamic('📞 Para más información, llamá al *3735604949*');
+                            }
+                        } catch (error) {
+                            console.error('Error al consultar sobreturnos:', error);
+                            await flowDynamic('❌ Error al consultar sobreturnos.');
+                            await flowDynamic('📞 Por favor, llamá al *3735604949* para más información.');
+                        }
                         return;
                     }
                     
@@ -1182,6 +1336,39 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
         }
 
         const selectedSlotNumber = parseInt(ctx.body);
+        const isSobreturnoMode = state.get('isSobreturnoMode');
+
+        // Manejo de sobreturnos
+        if (isSobreturnoMode) {
+            const availableSobreturnos = state.get('availableSobreturnos');
+
+            if (!availableSobreturnos || availableSobreturnos.length === 0) {
+                await flowDynamic('❌ Error: No se encontraron sobreturnos disponibles.');
+                return;
+            }
+
+            // Validar que el número esté en la lista de sobreturnos disponibles
+            const selectedSobreturno = availableSobreturnos.find((st: any) => st.numero === selectedSlotNumber);
+
+            if (!selectedSobreturno) {
+                await flowDynamic('❌ Número de sobreturno inválido. Por favor, selecciona un número de la lista.');
+                return;
+            }
+
+            await state.update({
+                selectedSobreturno: selectedSobreturno,
+                selectedSlot: null // Limpiar slot normal
+            });
+
+            console.log('=== DEBUG SOBRETURNO SELECCIONADO ===');
+            console.log('selectedSobreturno:', selectedSobreturno);
+            console.log('appointmentDate:', state.get('appointmentDate'));
+
+            // Dirigir al flujo de recopilación de datos del cliente
+            return gotoFlow(clientDataFlow);
+        }
+
+        // Manejo de turnos normales
         const availableSlots = state.get('availableSlots');
 
         if (isNaN(selectedSlotNumber) || selectedSlotNumber < 1 || selectedSlotNumber > availableSlots.length) {
