@@ -209,12 +209,30 @@ export const sobreTurnosTemporario = addKeyword(['sobreturnos', 'sobreturno', 'S
             const timeZone = 'America/Argentina/Buenos_Aires';
             const now = new Date();
             const localDate = toZonedTime(now, timeZone);
-            const todayFormatted = format(localDate, 'yyyy-MM-dd');
 
-            console.log('[SOBRETURNOS] Consultando sobreturnos para HOY:', todayFormatted);
+            const currentHour = parseInt(format(localDate, 'HH'), 10);
+            const currentMinute = parseInt(format(localDate, 'mm'), 10);
 
-            // Consultar sobreturnos disponibles de HOY
-            const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${todayFormatted}`, {
+            // Calcular próximo día hábil (misma lógica que welcomeFlow)
+            const getNextWorkingDay = (date: Date): Date => {
+                const nextDate = new Date(date);
+                nextDate.setHours(0, 0, 0, 0);
+                if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) {
+                    nextDate.setDate(nextDate.getDate() + 1);
+                }
+                while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
+                    nextDate.setDate(nextDate.getDate() + 1);
+                }
+                return nextDate;
+            };
+
+            const appointmentDate = getNextWorkingDay(localDate);
+            const formattedDate = format(appointmentDate, 'yyyy-MM-dd');
+
+            console.log('[SOBRETURNOS] Consultando sobreturnos para:', formattedDate);
+
+            // Consultar sobreturnos disponibles para el próximo día hábil
+            const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${formattedDate}`, {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-API-Key': CHATBOT_API_KEY
@@ -222,7 +240,7 @@ export const sobreTurnosTemporario = addKeyword(['sobreturnos', 'sobreturno', 'S
             });
 
             const sobreturnosData = await sobreturnosResponse.json();
-            const disponiblesHoy = sobreturnosData.success ? sobreturnosData.data.disponibles.length : 0;
+            const disponibles = sobreturnosData.success ? sobreturnosData.data.disponibles.length : 0;
 
             // Generar token público para la web
             let bookingUrl = 'https://micitamedica.me/agendar-turno';
@@ -245,10 +263,11 @@ export const sobreTurnosTemporario = addKeyword(['sobreturnos', 'sobreturno', 'S
             let message = `🏥 *SOLICITUD DE SOBRETURNOS*\n`;
             message += `¡Gracias por comunicarte con nosotros!\n\n`;
 
-            if (disponiblesHoy > 0) {
-                message += `✅ *Hay ${disponiblesHoy} sobreturnos disponibles HOY*\n\n`;
+            if (disponibles > 0) {
+                message += `✅ *Hay ${disponibles} sobreturnos disponibles*\n`;
+                message += `📆 *Fecha:* ${formatearFechaEspanol(formattedDate)}\n\n`;
             } else {
-                message += `⚠️ *No hay sobreturnos disponibles HOY*\n\n`;
+                message += `⚠️ *No hay sobreturnos disponibles para el próximo día hábil*\n\n`;
             }
 
             message += `📱 *Opciones para solicitar un sobreturno:*\n\n`;
@@ -1127,14 +1146,12 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                 }
 
                 if (slots.length === 0) {
-                    // No hay turnos normales, consultar sobreturnos disponibles de HOY
+                    // No hay turnos normales, consultar sobreturnos disponibles
                     await flowDynamic('❌ No hay turnos normales disponibles para este día.');
-                    await flowDynamic('⏳ *Consultando sobreturnos disponibles para HOY...*');
+                    await flowDynamic('⏳ *Consultando sobreturnos disponibles...*');
 
                     try {
-                        // Consultar sobreturnos de HOY (no del próximo día hábil)
-                        const todayFormatted = format(localChatDate, 'yyyy-MM-dd');
-                        const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${todayFormatted}`, {
+                        const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${formattedDate}`, {
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-API-Key': CHATBOT_API_KEY
@@ -1146,8 +1163,8 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                         if (sobreturnosData.success && sobreturnosData.data.disponibles.length > 0) {
                             const sobreturnos = sobreturnosData.data.disponibles;
 
-                            let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES HOY*\n`;
-                            sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(todayFormatted)}*\n\n`;
+                            let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES*\n`;
+                            sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(formattedDate)}*\n\n`;
 
                             sobreturnos.forEach((st: any) => {
                                 sobreturnoMessage += `${st.numero}. 📌 Sobreturno ${st.numero}\n`;
@@ -1158,7 +1175,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                             await state.update({
                                 availableSobreturnos: sobreturnos,
-                                appointmentDate: todayFormatted,
+                                appointmentDate: formattedDate,
                                 isSobreturnoMode: true,
                                 fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
                                 conversationStartTime: format(localChatDate, 'HH:mm'),
@@ -1166,7 +1183,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                             await flowDynamic(sobreturnoMessage);
                         } else {
-                            await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para HOY.');
+                            await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para este día.');
                             await flowDynamic('📞 Para más información, llamá al *3735604949*');
                         }
                     } catch (error) {
@@ -1300,14 +1317,12 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                     }
                     
                     if (slots.length === 0) {
-                        // No hay turnos normales, consultar sobreturnos disponibles de HOY
+                        // No hay turnos normales, consultar sobreturnos disponibles
                         await flowDynamic('❌ No hay turnos normales disponibles para este día.');
-                        await flowDynamic('⏳ *Consultando sobreturnos disponibles para HOY...*');
+                        await flowDynamic('⏳ *Consultando sobreturnos disponibles...*');
 
                         try {
-                            // Consultar sobreturnos de HOY (no del próximo día hábil)
-                            const todayFormatted = format(localChatDate, 'yyyy-MM-dd');
-                            const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${todayFormatted}`, {
+                            const sobreturnosResponse = await fetch(`${API_URL}/sobreturnos/date/${formattedDate}`, {
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'X-API-Key': CHATBOT_API_KEY
@@ -1319,8 +1334,8 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                             if (sobreturnosData.success && sobreturnosData.data.disponibles.length > 0) {
                                 const sobreturnos = sobreturnosData.data.disponibles;
 
-                                let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES HOY*\n`;
-                                sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(todayFormatted)}*\n\n`;
+                                let sobreturnoMessage = `🏥 *SOBRETURNOS DISPONIBLES*\n`;
+                                sobreturnoMessage += `📆 Para el día: *${formatearFechaEspanol(formattedDate)}*\n\n`;
 
                                 sobreturnos.forEach((st: any) => {
                                     sobreturnoMessage += `${st.numero}. 📌 Sobreturno ${st.numero}\n`;
@@ -1331,7 +1346,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                                 await state.update({
                                     availableSobreturnos: sobreturnos,
-                                    appointmentDate: todayFormatted,
+                                    appointmentDate: formattedDate,
                                     isSobreturnoMode: true,
                                     fullConversationTimestamp: format(localChatDate, "yyyy-MM-dd'T'HH:mm:ssXXX"),
                                     conversationStartTime: format(localChatDate, 'HH:mm'),
@@ -1339,7 +1354,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                                 await flowDynamic(sobreturnoMessage);
                             } else {
-                                await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para HOY.');
+                                await flowDynamic('❌ Lo siento, tampoco hay sobreturnos disponibles para este día.');
                                 await flowDynamic('📞 Para más información, llamá al *3735604949*');
                             }
                         } catch (error) {
