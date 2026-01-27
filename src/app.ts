@@ -1175,6 +1175,11 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             }
         }
         
+        // Verificar si el usuario quiere sobreturnos
+        if (['sobreturno', 'sobreturnos'].includes(ctx.body.toLowerCase())) {
+            return gotoFlow(sobreTurnosTemporario);
+        }
+
         // Lógica original de selección de horario
         if (ctx.body.toLowerCase() === 'cancelar') {
             await flowDynamic(`❌ *Reserva cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!`);
