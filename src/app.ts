@@ -1174,11 +1174,6 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                 return;
             }
         }
-        
-        // Verificar si el usuario quiere sobreturnos
-        if (['sobreturno', 'sobreturnos'].includes(ctx.body.toLowerCase())) {
-            return gotoFlow(sobreTurnosTemporario);
-        }
 
         // Lógica original de selección de horario
         if (ctx.body.toLowerCase() === 'cancelar') {
@@ -1251,10 +1246,10 @@ export const publicBookingLinkFlow = addKeyword(['bazinga', 'link', 'enlace'])
 const main = async () => {
     const adapterFlow = createFlow([
         // Flujos principales
+        sobreTurnosTemporario,  // DEBE estar primero para evitar conflicto con "turnos"
         welcomeFlow,         // Se activa con saludos y muestra horarios automáticamente
         //bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
         publicBookingLinkFlow, // Se activa con "bazinga", "link", "enlace"
-        sobreTurnosTemporario,
         clientDataFlow,
         goodbyeFlow,
         adminFlow
