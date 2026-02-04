@@ -1076,8 +1076,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             console.log('3. Fecha de cita:', formattedDate);
 
             // Mensaje de bienvenida
-            await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺
-                // ‼️*EL DIA JUEVES 05 DE FEBRERO NO ATIENDE POR LA TARDE ‼️*\n\n`);
+            await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺\n\n‼️*EL DIA JUEVES 05 DE FEBRERO NO ATIENDE POR LA TARDE ‼️*\n\n`);
 
             // Obtener las citas reservadas
             const reservedTimes = await getReservedAppointments(formattedDate);
@@ -1204,7 +1203,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                 message += '\n📝 *Para reservar, responde con el número del horario que deseas*\n ℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*';
                 // message += '\n🏥 Si necesitas un sobreturno, escribe *"sobreturnos"*';
-                message += '\n❌ Para cancelar, escribe *"cancelar"\n\n*‼️EL DIA JUEVES 05 DE FEBRERO NO ATIENDE POR LA MAÑANA ‼️*\n\n';
+                message += '‼️EL DIA JUEVES 05 DE FEBRERO NO ATIENDE POR LA MAÑANA ‼️*\n\n';
 
                 await flowDynamic(message);
             } else {
