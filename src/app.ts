@@ -337,9 +337,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
             if (unavailRes.ok) {
                 const unavailData = await unavailRes.json();
                 if (unavailData.success && unavailData.data.length > 0) {
-                    const periods = unavailData.data.map((b: any) => b.period);
-                    const effectivePeriod = periods.includes('full') || (periods.includes('morning') && periods.includes('afternoon'))
-                        ? 'full' : periods[0];
+                    const block = unavailData.data[0];
                     const getFollowingWD = (date: Date): Date => {
                         const nd = new Date(date);
                         nd.setDate(nd.getDate() + 1);
@@ -348,7 +346,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                         return nd;
                     };
                     const nextDay = getFollowingWD(appointmentDate);
-                    const periodStr = effectivePeriod === 'morning' ? 'la mañana' : effectivePeriod === 'afternoon' ? 'la tarde' : 'este día';
+                    const periodStr = block.period === 'morning' ? 'la mañana' : block.period === 'afternoon' ? 'la tarde' : 'este día';
                     await flowDynamic(
                         `⚠️ *El Dr. Kulinka no atiende ${periodStr} del ${formatearFechaEspanol(formattedDate)}.*\n\n` +
                         `📅 *Próximo día disponible:* ${formatearFechaEspanol(format(nextDay, 'yyyy-MM-dd'))}\n\n` +
@@ -1180,9 +1178,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                 if (unavailRes.ok) {
                     const unavailData = await unavailRes.json();
                     if (unavailData.success && unavailData.data.length > 0) {
-                        const periods = unavailData.data.map((b: any) => b.period);
-                        blockedPeriod = periods.includes('full') || (periods.includes('morning') && periods.includes('afternoon'))
-                            ? 'full' : periods[0];
+                        blockedPeriod = unavailData.data[0].period;
                         console.log('[UNAVAILABILITY] Bloqueo detectado:', blockedPeriod, 'para', formattedDate);
                     }
                 }
