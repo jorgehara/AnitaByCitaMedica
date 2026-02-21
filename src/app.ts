@@ -313,12 +313,64 @@ export const sobreTurnosTemporario = addKeyword(['sobreturnos', 'sobreturno', 'S
 
 //Flujo de sobreturnos - SOLO se activa con la palabra "sobreturnos"
 export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobreturnos', 'Sobreturno'])
+    .addAction(async (ctx, { flowDynamic, gotoFlow }) => {
+        // Check de disponibilidad antes de ofrecer sobreturnos
+        try {
+            const timeZone = 'America/Argentina/Buenos_Aires';
+            const now = new Date();
+            const localDate = toZonedTime(now, timeZone);
+            const currentHour = parseInt(format(localDate, 'HH'), 10);
+            const currentMinute = parseInt(format(localDate, 'mm'), 10);
+            const getNextWD = (date: Date): Date => {
+                const nd = new Date(date);
+                nd.setHours(0, 0, 0, 0);
+                if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) nd.setDate(nd.getDate() + 1);
+                while (nd.getDay() === 0 || nd.getDay() === 6) nd.setDate(nd.getDate() + 1);
+                return nd;
+            };
+            const appointmentDate = getNextWD(localDate);
+            const formattedDate = format(appointmentDate, 'yyyy-MM-dd');
+
+            const unavailRes = await fetch(`${API_URL}/unavailability?date=${formattedDate}`, {
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': CHATBOT_API_KEY }
+            });
+            if (unavailRes.ok) {
+                const unavailData = await unavailRes.json();
+                if (unavailData.success && unavailData.data.length > 0) {
+                    const block = unavailData.data[0];
+                    const getFollowingWD = (date: Date): Date => {
+                        const nd = new Date(date);
+                        nd.setDate(nd.getDate() + 1);
+                        nd.setHours(0, 0, 0, 0);
+                        while (nd.getDay() === 0 || nd.getDay() === 6) nd.setDate(nd.getDate() + 1);
+                        return nd;
+                    };
+                    const nextDay = getFollowingWD(appointmentDate);
+                    const periodStr = block.period === 'morning' ? 'la mañana' : block.period === 'afternoon' ? 'la tarde' : 'este día';
+                    await flowDynamic(
+                        `⚠️ *El Dr. Kulinka no atiende ${periodStr} del ${formatearFechaEspanol(formattedDate)}.*\n\n` +
+                        `📅 *Próximo día disponible:* ${formatearFechaEspanol(format(nextDay, 'yyyy-MM-dd'))}\n\n` +
+                        `📞 Para consultar llamá al *3735604949*`
+                    );
+                    return gotoFlow(goodbyeFlow);
+                }
+            }
+        } catch (e) {
+            console.log('[UNAVAILABILITY] Error en sobreturno check (fail-safe)');
+        }
+    })
     .addAnswer(
         '🏥 *SOLICITUD DE SOBRETURNOS*\n\n' +
         'Has solicitado un *sobreturno*. Para continuar, necesito algunos datos.\n\n' +
         'Por favor, indícame tu *NOMBRE* y *APELLIDO* (ej: Juan Pérez):',
         { capture: true },
-        async (ctx, { state }) => {
+        async (ctx, { state, flowDynamic, gotoFlow }) => {
+            // Check cancelar global
+            if (ctx.body.trim().toLowerCase() === 'cancelar') {
+                await state.clear();
+                await flowDynamic('❌ *Reserva cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!\n📞 *3735604949*');
+                return gotoFlow(goodbyeFlow);
+            }
             console.log('[SOBRETURNO] Paso 1: Nombre recibido:', ctx.body);
             const name = ctx.body.trim();
 
@@ -341,7 +393,13 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
         '6️⃣ Otras Obras Sociales\n\n' +
         '_Responde con el número correspondiente (1, 2, 3, 4, 5 o 6)_',
         { capture: true },
-        async (ctx, { state, flowDynamic }) => {
+        async (ctx, { state, flowDynamic, gotoFlow }) => {
+            // Check cancelar global
+            if (ctx.body.trim().toLowerCase() === 'cancelar') {
+                await state.clear();
+                await flowDynamic('❌ *Reserva cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!\n📞 *3735604949*');
+                return gotoFlow(goodbyeFlow);
+            }
             console.log('[SOBRETURNO] Paso 2: Obra social recibida:', ctx.body);
 
             // Verificar si el nombre anterior fue inválido
@@ -827,7 +885,13 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
         'Por favor, indícame tu *NOMBRE* y *APELLIDO* (ej: Juan Pérez):',
         { capture: true }
     )
-    .addAction(async (ctx, { state }) => {
+    .addAction(async (ctx, { state, flowDynamic, gotoFlow }) => {
+        // Check cancelar global
+        if (ctx.body.trim().toLowerCase() === 'cancelar') {
+            await state.clear();
+            await flowDynamic('❌ *Reserva cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!\n📞 *3735604949*');
+            return gotoFlow(goodbyeFlow);
+        }
         const name = ctx.body.trim();
         await state.update({ clientName: name });
     })
@@ -842,7 +906,13 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
         '_Responde con el número correspondiente (1, 2, 3, 4, 5 o 6)_',
         { capture: true }
     )
-    .addAction(async (ctx, { state }) => {
+    .addAction(async (ctx, { state, flowDynamic, gotoFlow }) => {
+        // Check cancelar global
+        if (ctx.body.trim().toLowerCase() === 'cancelar') {
+            await state.clear();
+            await flowDynamic('❌ *Reserva cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!\n📞 *3735604949*');
+            return gotoFlow(goodbyeFlow);
+        }
         const socialWorkOption = ctx.body.trim();
         const socialWorks = {
             '1': 'INSSSEP',
@@ -994,6 +1064,13 @@ export const clientDataFlow = addKeyword(['datos_cliente'])
         return gotoFlow(goodbyeFlow);
     });
 
+// Flujo de cancelación global — disponible desde cualquier momento
+export const cancelFlow = addKeyword(['cancelar', 'cancel', 'salir'])
+    .addAction(async (ctx, { flowDynamic, state }) => {
+        await state.clear();
+        await flowDynamic('❌ *Reserva cancelada.* Si necesitas más ayuda, no dudes en contactarnos nuevamente.\n🤗 ¡Que tengas un excelente día!\n📞 *3735604949*');
+    });
+
 // Flujo para agendar una cita médica
 //Flujo de despedida
 export const goodbyeFlow = addKeyword(['bye', 'adiós', 'chao', 'chau'])
@@ -1092,10 +1169,46 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             const formattedDate = format(appointmentDate, 'yyyy-MM-dd');
             console.log('3. Fecha de cita:', formattedDate);
 
+            // === CHECK DE DISPONIBILIDAD DEL MÉDICO ===
+            let blockedPeriod: string | null = null;
+            try {
+                const unavailRes = await fetch(`${API_URL}/unavailability?date=${formattedDate}`, {
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': CHATBOT_API_KEY }
+                });
+                if (unavailRes.ok) {
+                    const unavailData = await unavailRes.json();
+                    if (unavailData.success && unavailData.data.length > 0) {
+                        blockedPeriod = unavailData.data[0].period;
+                        console.log('[UNAVAILABILITY] Bloqueo detectado:', blockedPeriod, 'para', formattedDate);
+                    }
+                }
+            } catch (e) {
+                console.log('[UNAVAILABILITY] Error al consultar bloqueos (fail-safe, continúa normal)');
+            }
+
+            const getFollowingWorkingDay = (date: Date): Date => {
+                const nd = new Date(date);
+                nd.setDate(nd.getDate() + 1);
+                nd.setHours(0, 0, 0, 0);
+                while (nd.getDay() === 0 || nd.getDay() === 6) nd.setDate(nd.getDate() + 1);
+                return nd;
+            };
+
+            if (blockedPeriod === 'full') {
+                const nextDay = getFollowingWorkingDay(appointmentDate);
+                await flowDynamic(
+                    `🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺\n\n` +
+                    `⚠️ *El Dr. Kulinka no atiende el ${formatearFechaEspanol(formattedDate)}.*\n\n` +
+                    `📅 *Próximo día disponible:* ${formatearFechaEspanol(format(nextDay, 'yyyy-MM-dd'))}\n\n` +
+                    `📞 Para consultar llamá al *3735604949*`
+                );
+                return;
+            }
+
             // Mensaje de bienvenida
             await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺`);
                 //\n\n‼️*EL DIA 16 y 17 DE FEBRERO NO ATIENDE*‼️\n\n
-            
+
 
             // Obtener las citas reservadas
             const reservedTimes = await getReservedAppointments(formattedDate);
@@ -1113,8 +1226,8 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                 let morningMessage = '';
                 let afternoonMessage = '';
 
-                // Filtrar horarios disponibles
-                const availableMorning = data.data.available.morning
+                // Filtrar horarios disponibles (respetando bloqueos de disponibilidad)
+                const availableMorning = (blockedPeriod === 'morning') ? [] : data.data.available.morning
                     .filter(slot => {
                         const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
 
@@ -1130,7 +1243,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                         return slot.status === 'available';
                     });
 
-                const availableAfternoon = data.data.available.afternoon
+                const availableAfternoon = (blockedPeriod === 'afternoon') ? [] : data.data.available.afternoon
                     .filter(slot => {
                         const [slotHour, slotMinute] = slot.displayTime.split(':').map(Number);
 
@@ -1165,6 +1278,17 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
                 }
 
                 if (slots.length === 0) {
+                    // Si hay bloqueo de período, informar y no caer en sobreturnos
+                    if (blockedPeriod === 'morning' || blockedPeriod === 'afternoon') {
+                        const periodStr = blockedPeriod === 'morning' ? 'la mañana' : 'la tarde';
+                        const nextDay = getFollowingWorkingDay(appointmentDate);
+                        await flowDynamic(
+                            `⚠️ *El Dr. Kulinka no atiende ${periodStr} del ${formatearFechaEspanol(formattedDate)}.*\n\n` +
+                            `📅 *Próximo día disponible:* ${formatearFechaEspanol(format(nextDay, 'yyyy-MM-dd'))}\n\n` +
+                            `📞 Para consultar llamá al *3735604949*`
+                        );
+                        return;
+                    }
                     // No hay turnos normales, consultar sobreturnos disponibles
                     await flowDynamic('❌ No hay turnos normales disponibles para este día.');
                     await flowDynamic('⏳ *Consultando sobreturnos disponibles...*');
@@ -1527,6 +1651,7 @@ export const publicBookingLinkFlow = addKeyword(['bazinga', 'link', 'enlace'])
 const main = async () => {
     const adapterFlow = createFlow([
         // Flujos principales
+        cancelFlow,          // PRIMERO: captura "cancelar" en cualquier momento fuera de capture
         //sobreTurnosTemporario,  // DEBE estar primero para evitar conflicto con "turnos"
         bookSobreturnoFlow,  // DEBE estar primero para evitar conflicto con "turnos" en welcomeFlow
         welcomeFlow,         // Se activa con saludos y muestra horarios automáticamente
