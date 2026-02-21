@@ -1,6 +1,6 @@
 #!/bin/bash
 
-interval=300  # 5 minutos en segundos
+interval=180 # en segundos
 restart_count=0
 log_file="restart-server.log"
 
@@ -8,6 +8,36 @@ while true; do
     restart_count=$((restart_count+1))
     timestamp=$(date +"%Y-%m-%d %H:%M:%S")
     echo "[$timestamp] Reinicio #$restart_count" >> "$log_file"
-    pm2 restart anita-bot 2>/dev/null || pm2 start dist/app.js --name anita-bot
-    sleep $interval
+    echo "Matando procesos en el puerto 3008..."
+    fuser -k 3008/tcp 2>/dev/null
+    echo "Liberando el puerto 3008 si está ocupado..."
+    PID=$(sudo lsof -t -i:3008)
+    if [ ! -z "$PID" ]; then
+      sudo kill -9 $PID
+      echo "Proceso $PID eliminado."
+    fi
+    npm run dev &
+    server_pid=$!
+
+    for ((i=0; i<$interval; i++)); do
+        sleep 1
+     if grep -q "SOBRETURNO TIMEOUT" restart-server.log || \
+         grep -q "\\[SOBRETURNO SERVICE\\] Sistema en modo offline:" restart-server.log || \
+         grep -q "\\[nodemon\\] app crashed" restart-server.log || \
+         grep -q "Timed Out" restart-server.log || \
+         grep -q "Missed call" restart-server.log || \
+         grep -q "Buffer" restart-server.log || \
+         grep -iq "crash" restart-server.log || \
+         grep -iq "crashed" restart-server.log || \
+         grep -q "Failed to decrypt message with any known session" restart-server.log || \
+         grep -q "Bad MAC" restart-server.log || \
+         grep -q $'0|restart- | \xE2\x9C\x85 Connected Provider\n0|restart- | Tell a contact on your WhatsApp to write "hello"...\n0|restart- | \n0|restart- | [nodemon] app crashed - waiting for file changes before starting...' restart-server.log; then
+        echo "SOBRETURNO TIMEOUT, modo offline, app crashed, Timed Out, llamada perdida, error de clave, Bad MAC o crash detectado. Reiniciando inmediatamente..." >> "$log_file"
+        kill $server_pid 2>/dev/null
+        break
+        fi
+    done
+
+    kill $server_pid 2>/dev/null
+    echo "Servidor detenido o reiniciado."
 done
