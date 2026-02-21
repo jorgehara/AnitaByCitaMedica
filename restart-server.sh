@@ -8,6 +8,6 @@ while true; do
     restart_count=$((restart_count+1))
     timestamp=$(date +"%Y-%m-%d %H:%M:%S")
     echo "[$timestamp] Reinicio #$restart_count" >> "$log_file"
-    pm2 restart anita-bot
+    pm2 restart anita-bot 2>/dev/null || pm2 start dist/app.js --name anita-bot
     sleep $interval
 done
