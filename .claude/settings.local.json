@@ -12,10 +12,7 @@
       "Bash(npm run lint:*)",
       "Bash(npx tsx:*)",
       "mcp__plugin_engram_engram__mem_save",
-      "Bash(echo:*)",
-      "Bash(npm run build:all:*)",
-      "mcp__plugin_engram_engram__mem_session_summary",
-      "Bash(node:*)"
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []
