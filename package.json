@@ -13,7 +13,12 @@
     "pm2:stop": "pm2 stop anita-bot",
     "pm2:restart": "pm2 restart anita-bot",
     "pm2:delete": "pm2 delete anita-bot",
-    "pm2:logs": "pm2 logs anita-bot"
+    "pm2:logs": "pm2 logs anita-bot",
+    "pm2:restart-server:start": "pm2 start restart-server.sh --interpreter bash --name restart-server",
+    "pm2:restart-server:logs": "pm2 logs restart-server",
+    "pm2:status": "pm2 status",
+    "pm2:setup": "pm2 startup && pm2 save",
+    "server:deploy": "npm run pm2:restart-server:start && npm run pm2:status && npm run pm2:setup"
   },
   "keywords": [],
   "dependencies": {
