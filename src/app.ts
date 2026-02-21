@@ -201,6 +201,23 @@ async function createAppointment(appointmentData: AppointmentData): Promise<APIR
     return appointmentService.createAppointment(appointmentData);
 }
 
+async function generarOpcionesSobreturno(): Promise<string> {
+    let bookingUrl = 'https://micitamedica.me/seleccionar-sobreturno';
+    try {
+        const tokenResponse = await axiosInstance.post('/tokens/generate-public-token', {}, {
+            headers: { 'X-API-Key': CHATBOT_API_KEY }
+        });
+        if (tokenResponse.data.success && tokenResponse.data.data.token) {
+            bookingUrl = `https://micitamedica.me/seleccionar-sobreturno?token=${tokenResponse.data.data.token}`;
+        }
+    } catch (e) {
+        // Si falla la generación del token, usar URL estática
+    }
+    return `\n\n📱 *Opciones para solicitar un sobreturno:*\n\n` +
+           `1️⃣ *Por teléfono:*\n   📞 Llamá al: *3735604949*\n\n` +
+           `2️⃣ *Por la web:*\n   🌐 ${bookingUrl}`;
+}
+
 
 //Flujo de sobreturnos - SOLO se activa con la palabra "sobreturnos"
 export const sobreTurnosTemporario = addKeyword(['sobreturnos', 'sobreturno', 'Sobreturnos', 'Sobreturno'])
@@ -523,7 +540,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                 const sobreturnosDisponibles = [...disponiblesManiana, ...disponiblesTarde];
 
                 if (sobreturnosDisponibles.length === 0) {
-                    await flowDynamic('❌ Lo siento, no hay sobreturnos disponibles para hoy.\n\nℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*');
+                    await flowDynamic('❌ Lo siento, no hay sobreturnos disponibles para hoy.' + await generarOpcionesSobreturno());
                     return;
                 }
 
@@ -786,18 +803,18 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                             errorMessage = '❌ Este sobreturno ya no está disponible.';
                         }
 
-                        await flowDynamic(errorMessage + ' Por favor, intenta con otro número o más tarde.\n\nℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*');
+                        await flowDynamic(errorMessage + ' Por favor, intenta con otro número o más tarde.' + await generarOpcionesSobreturno());
                         return;
                     }
                 } catch (error) {
                     console.error('[SOBRETURNO] Error al enviar al backend:', error);
-                    await flowDynamic('❌ Ocurrió un error inesperado al agendar el sobreturno. Por favor, intenta nuevamente más tarde.\n\nℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*');
+                    await flowDynamic('❌ Ocurrió un error inesperado al agendar el sobreturno. Por favor, intenta nuevamente más tarde.' + await generarOpcionesSobreturno());
                 }
                 await state.clear();
                 return gotoFlow(goodbyeFlow);
             } catch (error) {
                 console.error('[SOBRETURNO] Error al procesar:', error);
-                await flowDynamic('❌ Ocurrió un error inesperado. Por favor, intenta nuevamente más tarde.\n\nℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*');
+                await flowDynamic('❌ Ocurrió un error inesperado. Por favor, intenta nuevamente más tarde.' + await generarOpcionesSobreturno());
                 await state.clear();
             }
         }
