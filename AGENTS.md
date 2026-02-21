@@ -1,432 +1,298 @@
-# Guía de Agentes para AnitaByCitaMedica
+# Guía de Agentes para AnitaByCitaMedica (ANITA Chatbot)
+
+> **ATENCIÓN**: Este documento fue actualizado el 2026-02-21 para reflejar el estado real del código. La versión anterior tenía información desactualizada (flows inexistentes).
 
 Este documento proporciona una visión general del proyecto AnitaByCitaMedica para que los agentes de Claude Code puedan entender rápidamente la estructura y trabajar de manera eficiente en futuras tareas.
 
 ## Visión General del Proyecto
 
-**AnitaByCitaMedica** es un chatbot de WhatsApp para gestión de citas médicas del consultorio del Dr. Daniel Kulinka con las siguientes características:
+**AnitaByCitaMedica** es el chatbot de WhatsApp del Dr. Kulinka. Gestiona reservas de turnos médicos y sobreturnos integrándose con el backend de **CitaMedicaBeta**.
 
-- Bot conversacional en WhatsApp usando BuilderBot framework
-- Integración completa con CitaMedicaBeta backend API
-- Generación automática de tokens públicos para reservas
-- Envío de links personalizados a pacientes
-- Gestión de citas regulares y sobreturnos
-- Conexión con MongoDB para persistencia
+- Framework: BuilderBot + Baileys (WhatsApp Web API)
+- Runtime: Node.js + TypeScript
+- DB: MongoDB (via MongoAdapter)
+- HTTP Client: Axios con retry logic (30s timeout, 3 reintentos)
+- Backend: `https://micitamedica.me/api`
 
-## Arquitectura del Sistema
+---
 
-```
-AnitaByCitaMedica/
-├── src/                # Código fuente TypeScript
-│   ├── app.ts          # Entry point, configuración del bot
-│   ├── flows/          # Flujos de conversación
-│   ├── utils/          # Servicios y utilidades
-│   ├── scripts/        # Scripts auxiliares
-│   ├── config/         # Configuración (axios, app)
-│   └── types/          # Definiciones TypeScript
-├── bot_sessions/       # Sesiones de WhatsApp (gitignored)
-├── .env                # Variables de entorno
-├── CLAUDE.md           # Instrucciones para Claude Code (LEER PRIMERO)
-├── AGENTS.md           # Este archivo
-└── .claude/            # Configuración de Claude Code
-```
-
-### Sistema Completo
+## Sistema Completo
 
 ```
 ┌─────────────────────┐
 │  Usuario WhatsApp   │
-│  (Paciente)         │
 └──────────┬──────────┘
            │
            v
 ┌─────────────────────────────────────────┐
-│   ANITACHATBOT (Puerto 3008)            │
-│   Chatbot de WhatsApp                   │
-│   - Captura datos del paciente          │
-│   - Genera tokens públicos              │
-│   - Envía links de reserva              │
-│   - Gestiona flujos conversacionales    │
+│      ANITA CHATBOT (Puerto 3008)        │
+│  C:\Users\JorgeHaraDevs\Desktop\        │
+│  AnitaByCitaMedica                      │
+│  - Muestra turnos disponibles           │
+│  - Reserva turnos normales              │
+│  - Informa/reserva sobreturnos          │
 └──────────┬──────────────────────────────┘
            │
            v
 ┌─────────────────────────────────────────┐
-│   CitaMedicaBeta API (Puerto 3001)      │
-│   - POST /api/auth/generate-public-token│
-│   - GET /api/sobreturnos/date/:date     │
-│   - POST /api/sobreturnos               │
-│   - GET /api/appointments/available/:date│
-│   - POST /api/appointments              │
-└──────────┬──────────────────────────────┘
-           │
-           v
-    ┌──────┴──────┐
-    │             │
-    v             v
-┌─────────┐  ┌──────────────┐
-│ MongoDB │  │ Google       │
-│         │  │ Calendar API │
-└─────────┘  └──────────────┘
+│   CitaMedicaBeta Backend                │
+│   API: https://micitamedica.me/api      │
+│   - Appointments API                    │
+│   - Sobreturnos API                     │
+│   - Tokens API                          │
+│   - Google Calendar sync (interno)      │
+└─────────────────────────────────────────┘
 ```
 
-## BuilderBot Framework
+---
 
-### Conceptos Clave
+## Estructura Real del Proyecto (2026-02-21)
 
-**BuilderBot** es un framework para crear chatbots conversacionales en WhatsApp.
+```
+AnitaByCitaMedica/
+├── src/
+│   ├── app.ts                  # Punto de entrada + TODOS los flows activos inline
+│   ├── flows/
+│   │   ├── sobreturnoFlow.ts   # Flow de reserva de sobreturno (separado, INACTIVO en prod)
+│   │   └── availableSlots.flow.ts
+│   ├── utils/
+│   │   ├── appointmentService.ts   # Cliente API turnos normales
+│   │   ├── sobreturnoService.ts    # Cliente API sobreturnos (Singleton)
+│   │   ├── cache.ts                # Cache en memoria
+│   │   ├── dateFormatter.ts        # formatearFechaEspanol()
+│   │   ├── botControl.ts
+│   │   └── fallbackData.ts         # Datos de respaldo offline
+│   ├── config/
+│   │   ├── axios.ts                # axiosInstance con retry
+│   │   └── app.ts                  # APP_CONFIG: PORT, TIMEZONE, MONGO_URI
+│   └── types/
+│       └── api.ts
+├── CLAUDE.md                   # Instrucciones para Claude (LEER PRIMERO)
+├── AGENTS.md                   # Este archivo
+└── .env
+```
 
-**Componentes principales:**
-1. **Provider**: Maneja la conexión con WhatsApp (Baileys)
-2. **Database**: Almacena conversaciones y estado (MongoDB)
-3. **Flows**: Define los flujos de conversación
-4. **Bot**: Instancia principal que une todo
+> **IMPORTANTE**: Los flows `appointment.flow.ts`, `menu.flow.ts` y `gpt.flow.ts` NO EXISTEN en este proyecto. Toda la lógica está en `src/app.ts`.
 
-**Estructura de un Flow:**
+---
+
+## Flujos Activos en Producción
+
+Registrados en `src/app.ts → main()`:
+
 ```typescript
-import { addKeyword } from '@builderbot/bot';
-
-export const myFlow = addKeyword(['keyword'])
-    .addAnswer('Mensaje de respuesta')
-    .addAction(async (ctx, { flowDynamic, gotoFlow, fallBack }) => {
-        // Lógica personalizada
-    });
+const adapterFlow = createFlow([
+    sobreTurnosTemporario,  // "sobreturno", "sobreturnos"
+    welcomeFlow,            // saludos + "turnos", "turno"
+    publicBookingLinkFlow,  // "bazinga", "link", "enlace"
+    clientDataFlow,         // flow interno (datos del paciente)
+    goodbyeFlow,            // "bye", "adiós", "chao"
+    adminFlow,              // "!admin", "!help"
+    //bookSobreturnoFlow    // COMENTADO - inactivo en prod
+])
 ```
 
-## Flujos de Conversación
+### `welcomeFlow` (hola, turnos, buenos días, etc.)
+1. Verifica que no haya sesión activa en progreso
+2. Calcula próximo día hábil:
+   - Si hora > 20:30 → pasa al día siguiente
+   - Salta sábado (6) y domingo (0)
+3. Muestra horarios disponibles de turnos normales numerados (1, 2, 3...)
+4. Si NO hay turnos → automáticamente consulta y ofrece sobreturnos disponibles
+5. Usuario responde con número → `gotoFlow(clientDataFlow)`
 
-### 1. appointment.flow.ts (Flujo Principal)
+### `clientDataFlow` (keyword interno: "datos_cliente")
+Recolecta nombre + obra social, luego crea la reserva.
+- Si `isSobreturnoMode = true` en state → crea sobreturno (`POST /sobreturnos`)
+- Si no → crea turno normal (`POST /appointments`)
 
-**Propósito**: Gestiona el proceso completo de agendamiento de citas y sobreturnos.
+### `sobreTurnosTemporario` (sobreturno, sobreturnos)
+- Informa cantidad disponible para el próximo día hábil
+- Da teléfono: **3735604949**
+- Genera token y da link: `https://micitamedica.me/reservar-turno?token=...`
 
-**Flujo de Trabajo**:
-```
-1. Usuario saluda al bot ("hola", "buenos días", etc.)
-2. Bot pregunta nombre completo
-3. Bot pregunta obra social
-4. Bot pregunta número de teléfono
-5. Bot genera token público (POST /api/auth/generate-public-token)
-6. Bot envía link personalizado con token
-   - Para sobreturnos: /seleccionar-sobreturno?token=XXX
-   - Para citas: /agendar-turno?token=XXX
-7. Usuario hace clic en link y completa reserva en web
-8. Bot confirma recepción de datos
-```
+### `publicBookingLinkFlow` (bazinga, link, enlace)
+Genera token temporal y devuelve URL de reserva web.
 
-**Keywords que activan el flujo**:
-- 'hola', 'buenos días', 'buenas tardes', 'buenas noches'
-- 'ola', 'hola!', 'hey'
-- 'quiero un turno', 'necesito una cita'
-- 'agendar', 'reservar'
+### `adminFlow` (!admin, !help)
+Solo accesible para `ADMIN_NUMBER` en env. Comandos: `!disconnect`, `!status`.
 
-**Estados del flujo**:
+---
+
+## Tipos de Citas
+
+### Turnos Normales (`/api/appointments`)
+- Horarios específicos a elección del paciente (ej: "11:15", "16:30")
+- El backend define los slots disponibles (mañana y tarde)
+- Se muestra una lista numerada al usuario, elige el número
+
+### Sobreturnos (`/api/sobreturnos`) — Sistema de Tickets
+- **NO son horarios a elección libre**: son tickets numerados 1-10
+- El paciente elige "Sobreturno 3", no "11:30"
+- **Turno Mañana (tickets 1-5)**: a partir de las 11:00
+  - Sobreturno 1 → 11:00
+  - Sobreturno 2 → 11:15
+  - Sobreturno 3 → 11:30
+  - Sobreturno 4 → 11:45
+  - Sobreturno 5 → 12:00
+- **Turno Tarde (tickets 6-10)**: a partir de las 19:00
+  - Sobreturno 6 → 19:00
+  - Sobreturno 7 → 19:15
+  - Sobreturno 8 → 19:30
+  - Sobreturno 9 → 19:45
+  - Sobreturno 10 → 20:00
+
+---
+
+## Autenticación con el Backend
+
+- **API Key**: Header `X-API-Key: <CHATBOT_API_KEY>` (env var)
+- Configurado globalmente en `src/config/axios.ts`
+- También se usa en llamadas directas `fetch()` dentro de `app.ts`
+
+---
+
+## Endpoints Usados por el Chatbot
+
+| Endpoint | Descripción |
+|----------|-------------|
+| `GET /appointments/available/:date` | Horarios disponibles para turnos |
+| `POST /appointments` | Crear turno normal |
+| `GET /sobreturnos/date/:date` | Sobreturnos disponibles (respuesta: `{success, data: {disponibles: [{numero, ...}]}}`) |
+| `GET /sobreturnos/available/:date` | Disponibilidad detallada con `isAvailable` |
+| `GET /sobreturnos/validate` | Validar disponibilidad (`?date=&sobreturnoNumber=`) |
+| `GET /sobreturnos/validate/:numero` | Validar número específico |
+| `GET /sobreturnos/status/:date` | Estado completo (`{data: {reservados: [], total, disponibles}}`) |
+| `POST /sobreturnos` | Crear sobreturno |
+| `POST /sobreturnos/cache/clear` | Limpiar caché del backend |
+| `POST /tokens/generate-public-token` | Generar token público para web |
+
+---
+
+## Servicios Clave
+
+### `sobreturnoService.ts` (Singleton — `SobreturnoService.getInstance()`)
+
 ```typescript
-// Captura de datos
-name: string          // Nombre del paciente
-obraSocial: string    // Obra social
-phone: string         // Teléfono
+getAvailableSobreturnos(date)      // → APIResponseWrapper con isAvailable por slot
+createSobreturno(data)             // → APIResponseWrapper
+isSobreturnoAvailable(date, num)   // → boolean
+getReservedSobreturnos(date)       // → SobreturnoResponse[]
+getSobreturnosStatus(date)         // → {data: {reservados, total, disponibles}}
+clearDateCache(date)               // limpia caché local de esa fecha
 ```
 
-### 2. menu.flow.ts (Menú Principal)
+Tiene modo offline con caché (`./cache.ts`).
 
-**Propósito**: Proporciona información general del consultorio.
+### `appointmentService.ts`
 
-**Opciones del menú**:
-- Información de contacto
-- Horarios de atención
-- Ubicación del consultorio
-- Obras sociales aceptadas
-- Volver al menú principal
-
-**Keywords**:
-- 'menu', 'menú', 'opciones'
-- 'ayuda', 'help'
-- 'información', 'info'
-
-### 3. gpt.flow.ts (Asistente IA)
-
-**Propósito**: Respuestas inteligentes usando OpenAI GPT.
-
-**Características**:
-- Responde preguntas generales sobre el consultorio
-- Tono amigable y profesional
-- Contextualiza respuestas sobre servicios médicos
-- Deriva a flujos específicos cuando es necesario
-
-## Servicios de API
-
-### appointmentService.ts
-
-**Funciones principales**:
 ```typescript
-// Obtener horarios disponibles
-getAvailableTimes(date: string): Promise<string[]>
-
-// Crear cita regular
-createAppointment(data: AppointmentData): Promise<Appointment>
-
-// Verificar disponibilidad
-checkAvailability(date: string, time: string): Promise<boolean>
+getReservedSlots(date)    // → string[] (horarios tipo "11:15")
+createAppointment(data)   // → APIResponseWrapper
 ```
 
-### sobreturnoService.ts
+---
 
-**Funciones principales**:
-```typescript
-// Obtener sobreturnos disponibles por fecha
-getSobreturnosByDate(date: string): Promise<SobreturnoResponse>
+## Estado de Conversación (State) — Variables Clave
 
-// Crear sobreturno
-createSobreturno(data: SobreturnoData): Promise<Sobreturno>
-
-// Validar disponibilidad de sobreturno
-validateSobreturno(date: string, numero: number): Promise<boolean>
-```
-
-**Respuesta de getSobreturnosByDate**:
-```typescript
-{
-  success: true,
-  data: {
-    disponibles: [
-      { numero: 1, horario: '11:00', turno: 'mañana' },
-      { numero: 2, horario: '11:15', turno: 'mañana' },
-      // ... hasta 10 sobreturnos (5 mañana, 5 tarde)
-    ],
-    totalDisponibles: number,
-    fecha: string
-  }
-}
-```
-
-## Integración con CitaMedicaBeta API
-
-### Autenticación
-
-**Método**: API Key en header
-```typescript
-headers: {
-  'X-API-Key': process.env.CHATBOT_API_KEY
-}
-```
-
-### Generación de Token Público
-
-**Endpoint**: `POST /api/auth/generate-public-token`
-
-**Request**:
 ```typescript
 {
-  // Sin body, solo headers con API Key
+    clientName: string,
+    socialWork: string,
+    appointmentDate: string,      // 'yyyy-MM-dd'
+    availableSlots: TimeSlot[],   // Turnos normales
+    availableSobreturnos: any[],  // Sobreturnos (array de {numero})
+    isSobreturnoMode: boolean,
+    selectedSlot: TimeSlot,
+    selectedSobreturno: any,      // {numero: number}
+    invalidName: boolean,
+    disponiblesManiana: any[],
+    disponiblesTarde: any[],
 }
 ```
 
-**Response**:
-```typescript
-{
-  success: true,
-  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  expiresIn: "7h"
-}
+---
+
+## Obras Sociales (enum fijo)
+
+```
+'1': 'INSSSEP'
+'2': 'Swiss Medical'
+'3': 'OSDE'
+'4': 'Galeno'
+'5': 'CONSULTA PARTICULAR'
+'6': 'Otras Obras Sociales'
 ```
 
-**Uso del token**:
-```typescript
-const link = `https://micitamedica.me/seleccionar-sobreturno?token=${token}`;
-await flowDynamic(link);
-```
+---
 
-### Manejo de Errores
+## Configuración Importante
 
-**Retry Logic** (configurado en `config/axios.ts`):
-- Timeout: 30 segundos
-- Reintentos: 3 intentos
-- Backoff: Exponencial (1s, 2s, 4s)
-- Reintentar en: Network errors, 5xx, 408, 429
+- **Timezone**: `America/Argentina/Buenos_Aires`
+- **Puerto bot**: 3008
+- **Puerto Express health**: 3009
+- **Próximo día hábil**: Si hora > 20:30 → siguiente día. Salta sábado y domingo.
+- **Teléfono consultorio**: 3735604949
 
-**Patrón de manejo**:
-```typescript
-try {
-  const result = await service.method();
-  await flowDynamic('✅ Operación exitosa');
-} catch (error) {
-  console.error('[ERROR] API call failed:', error);
-  await flowDynamic('❌ Ocurrió un error. Por favor intenta nuevamente en unos minutos.');
-  return fallBack();
-}
-```
+---
 
-## Estructura de Datos
+## Variables de Entorno (.env)
 
-### AppointmentData (Cita Regular)
-```typescript
-interface AppointmentData {
-  clientName: string;      // Nombre completo
-  socialWork: string;      // Obra social
-  phone: string;           // Teléfono con código país
-  date: string;            // YYYY-MM-DD
-  time: string;            // HH:mm
-  email?: string;          // Opcional
-  isSobreturno: false;
-}
-```
-
-### SobreturnoData (Sobreturno)
-```typescript
-interface SobreturnoData {
-  clientName: string;
-  socialWork: string;
-  phone: string;
-  date: string;            // YYYY-MM-DD
-  sobreturnoNumber: number; // 1-10
-  isSobreturno: true;
-  // El horario se calcula automáticamente en backend
-}
-```
-
-### Patient (Datos capturados en chat)
-```typescript
-interface Patient {
-  name: string;          // Nombre completo del paciente
-  phone: string;         // Teléfono (capturado de ctx.from)
-  obrasocial: string;    // Obra social seleccionada
-}
-```
-
-## Configuración del Entorno
-
-### Variables de Entorno (.env)
 ```env
-# MongoDB
-MONGODB_URI=mongodb://username:password@host:port/database
-
-# API Integration
-API_URL=https://micitamedica.me/api
-CHATBOT_API_KEY=your-chatbot-api-key
-
-# Bot Configuration
+MONGODB_URI=mongodb://...
+CHATBOT_API_KEY=...
 PORT=3008
-
-# OpenAI (para GPT flow)
-OPENAI_API_KEY=sk-...
 ```
 
-### Puertos
-- **3008**: Puerto del chatbot (WhatsApp bot)
-- **3009**: Puerto de Express (health checks, APIs internas)
-- **3001**: Puerto de CitaMedicaBeta backend (externo)
+---
 
-## Comandos Útiles
+## Comandos de Desarrollo
 
-### Desarrollo
 ```bash
-npm run dev        # Inicia bot con nodemon (hot reload)
-npm run start      # Inicia bot en modo producción
-npm run build      # Compila TypeScript a dist/
-npm run lint       # Verifica código con ESLint
+npm run dev           # nodemon (hot reload)
+npm run build         # Compila TypeScript
+npm run start         # Producción
+npx tsc --noEmit      # Verificar tipos sin compilar
+npm run pm2:start     # Iniciar con PM2
+npm run pm2:restart   # Reiniciar
+npm run pm2:logs      # Ver logs
 ```
 
-### Producción (PM2)
-```bash
-npm run pm2:start     # Inicia con PM2
-npm run pm2:restart   # Reinicia bot
-npm run pm2:stop      # Detiene bot
-npm run pm2:logs      # Ver logs en tiempo real
-npm run pm2:delete    # Elimina proceso PM2
-```
+---
 
-### Testing Manual
-1. Iniciar bot: `npm run dev`
-2. Escanear QR en terminal con WhatsApp
-3. Enviar mensaje de prueba al número del bot
-4. Verificar logs en consola
+## Historial de Decisiones Clave
 
-## Archivos de Referencia Clave
+### Commit fc40f0c (Oct 2025): Auto-asignación de sobreturno
+`sobreturnoFlow.ts` fue modificado para auto-asignar el primer sobreturno disponible según hora:
+- Antes de las 12:00 → prioriza mañana (1-5), luego tarde (6-10)
+- Después de las 12:00 → prioriza tarde (6-10), luego mañana (1-5)
 
-Para entender rápidamente el sistema, lee estos archivos en orden:
+**Estado actual**: Este flow está comentado en producción. El flujo activo es `sobreTurnosTemporario` que redirige a web/teléfono.
 
-1. **CLAUDE.md** - Instrucciones completas para Claude Code
-2. **src/app.ts** - Entry point, configuración del bot
-3. **src/flows/appointment.flow.ts** - Flujo principal de agendamiento
-4. **src/utils/appointmentService.ts** - Cliente API para citas
-5. **src/utils/sobreturnoService.ts** - Cliente API para sobreturnos
-6. **src/config/axios.ts** - Configuración HTTP
+### Estado del archivo `src/flows/sobreturnoFlow.ts`
+Implementación completa de reserva directa (muestra disponibles, usuario elige número, crea reserva). **NO está activo** en producción (comentado en `main()` de app.ts).
 
-## Documentación Detallada
+---
 
-Para información más detallada sobre áreas específicas:
+## Convenciones
 
-- **Chatbot**: Ver `SUBAGENTS.md` (detalles de flows, utils, scripts)
-- **API Backend**: Proyecto separado en `C:\Users\JorgeHaraDevs\Desktop\CitaMedicaBeta`
-- **BuilderBot Framework**: https://builderbot.vercel.app/
+- Logs con prefijos: `[SOBRETURNO]`, `[SOBRETURNO FLOW]`, `[SOBRETURNO SERVICE]`, `[PUBLIC LINK]`, `[DEBUG]`, `[ERROR]`
+- Fechas para API: `'yyyy-MM-dd'`
+- Fechas para usuario: `formatearFechaEspanol()` → "domingo 19 de enero de 2026"
+- Horarios: `'HH:mm'` (24h)
+- **NO modificar textos de flows sin autorización explícita del cliente**
 
-## Convenciones de Desarrollo
+---
 
-### No Hacer
-- ❌ NO crear archivos .md innecesarios
-- ❌ NO usar emojis a menos que el usuario lo solicite
-- ❌ NO modificar archivos del backend (repo separado)
-- ❌ NO cambiar flujos de conversación sin probar
-- ❌ NO exponer datos sensibles en logs
-- ❌ NO cambiar configuración de API sin consultar
-- ❌ **CRÍTICO: NO MODIFICAR TEXTOS DE FLOWS** - Los mensajes al usuario están validados por el cliente y son intocables
+## Archivos de Referencia Clave (en orden de lectura)
 
-### Hacer
-- ✅ Seguir patrones establecidos (ver flows existentes)
-- ✅ Usar mensajes claros y amigables en español
-- ✅ Validar entrada de usuario antes de procesar
-- ✅ Manejar errores con try-catch y mensajes claros
-- ✅ Logging con prefijos `[DEBUG]`, `[ERROR]`, `[WARN]`
-- ✅ Usar TypeScript types correctamente
-- ✅ Verificar tipos con `npx tsc --noEmit` antes de commit
+1. **CLAUDE.md** — Protocolo de trabajo obligatorio
+2. **src/app.ts** — Todos los flows activos y lógica de reserva (inline)
+3. **src/utils/sobreturnoService.ts** — Lógica de sobreturnos
+4. **src/flows/sobreturnoFlow.ts** — Flow de sobreturno (inactivo, referencia)
+5. **src/utils/appointmentService.ts** — Lógica de turnos normales
+6. **src/config/axios.ts** — Configuración HTTP con retry
 
-## URLs de Producción
+---
 
-- **Chatbot**: Puerto local 3008 (no expuesto públicamente)
-- **Backend API**: https://micitamedica.me/api
-- **Frontend Web**: https://micitamedica.me
-- **Página de Sobreturnos**: https://micitamedica.me/seleccionar-sobreturno?token=XXX
-- **Página de Citas**: https://micitamedica.me/agendar-turno?token=XXX
-
-## Notas Importantes
-
-1. **Sesiones de WhatsApp**: Se almacenan en `bot_sessions/`, no commitear al repo
-2. **QR Code**: En primera ejecución, escanear QR desde WhatsApp móvil
-3. **Token Público**: Válido 7 horas, generado para cada conversación
-4. **MongoDB**: Requerido para persistencia de conversaciones
-5. **Retry Logic**: Configurado para manejar timeouts de CitaMedicaBeta API
-6. **Timezone**: America/Argentina/Buenos_Aires (coherente con backend)
-7. **Sobreturnos**: 10 slots fijos por día (5 mañana, 5 tarde)
-8. **Horarios Mañana**: 11:00, 11:15, 11:30, 11:45, 12:00
-9. **Horarios Tarde**: 19:00, 19:15, 19:30, 19:45, 20:00
-
-## Logs y Debugging
-
-### Archivos de Log
-- `baileys.log` - Logs de Baileys (WhatsApp provider)
-- `core.class.log` - Logs del core de BuilderBot
-- `queue.class.log` - Logs de cola de mensajes
-
-### Prefijos de Log
-```typescript
-console.log('[DEBUG]', 'Mensaje de debug');
-console.error('[ERROR]', 'Mensaje de error:', error);
-console.warn('[WARN]', 'Advertencia');
-```
-
-### Debugging de Flujos
-```typescript
-// En flows
-.addAction(async (ctx, { flowDynamic }) => {
-    console.log('[DEBUG] Context:', ctx);
-    console.log('[DEBUG] User input:', ctx.body);
-    console.log('[DEBUG] User phone:', ctx.from);
-    // ...
-});
-```
-
-## Última Actualización
-
-- **Fecha**: 2026-01-20
-- **Cambio**: Documentación inicial del proyecto AnitaByCitaMedica
-- **Archivos nuevos**: `CLAUDE.md`, `AGENTS.md`, `SUBAGENTS.md`
-- **Propósito**: Facilitar trabajo de agentes de Claude Code
+**Última actualización**: 2026-02-21

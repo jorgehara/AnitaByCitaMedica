@@ -523,7 +523,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                 const sobreturnosDisponibles = [...disponiblesManiana, ...disponiblesTarde];
 
                 if (sobreturnosDisponibles.length === 0) {
-                    await flowDynamic('❌ Lo siento, no hay sobreturnos disponibles para hoy.');
+                    await flowDynamic('❌ Lo siento, no hay sobreturnos disponibles para hoy.\n\nℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*');
                     return;
                 }
 
@@ -615,7 +615,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
 
                 // Asignar horario fijo SOLO tarde (19:00 a 20:00)
                 const sobreturnoHorariosTarde = [
-                    '19:00'
+                    '19:00', '19:15', '19:30', '19:45', '20:00'
                 ];
                 let horarioAsignado = '';
                 if (disponiblesManiana.length === 0 && disponiblesTarde.length > 0) {
@@ -633,7 +633,7 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                     } else if (numero >= 1 && numero <= 5) {
                         // Si selecciona de la mañana, asignar horario de la mañana
                         const sobreturnoHorariosManiana = [
-                            '11:00'
+                            '11:00', '11:15', '11:30', '11:45', '12:00'
                         ];
                         horarioAsignado = sobreturnoHorariosManiana[numero - 1];
                     } else {
@@ -786,18 +786,18 @@ export const bookSobreturnoFlow = addKeyword(['sobreturnos', 'sobreturno', 'Sobr
                             errorMessage = '❌ Este sobreturno ya no está disponible.';
                         }
 
-                        await flowDynamic(errorMessage + ' Por favor, intenta con otro número o más tarde.');
+                        await flowDynamic(errorMessage + ' Por favor, intenta con otro número o más tarde.\n\nℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*');
                         return;
                     }
                 } catch (error) {
                     console.error('[SOBRETURNO] Error al enviar al backend:', error);
-                    await flowDynamic('❌ Ocurrió un error inesperado al agendar el sobreturno. Por favor, intenta nuevamente más tarde.');
+                    await flowDynamic('❌ Ocurrió un error inesperado al agendar el sobreturno. Por favor, intenta nuevamente más tarde.\n\nℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*');
                 }
                 await state.clear();
                 return gotoFlow(goodbyeFlow);
             } catch (error) {
                 console.error('[SOBRETURNO] Error al procesar:', error);
-                await flowDynamic('❌ Ocurrió un error inesperado. Por favor, intenta nuevamente más tarde.');
+                await flowDynamic('❌ Ocurrió un error inesperado. Por favor, intenta nuevamente más tarde.\n\nℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*');
                 await state.clear();
             }
         }
@@ -1076,7 +1076,8 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
             console.log('3. Fecha de cita:', formattedDate);
 
             // Mensaje de bienvenida
-            await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺\n\n‼️*EL DIA 16 y 17 DE FEBRERO NO ATIENDE*‼️\n\n`);
+            await flowDynamic(`🤖🩺 *¡Bienvenido al Asistente Virtual del Dr.Kulinka!* 🩺`);
+                //\n\n‼️*EL DIA 16 y 17 DE FEBRERO NO ATIENDE*‼️\n\n
             
 
             // Obtener las citas reservadas
@@ -1204,7 +1205,7 @@ const welcomeFlow = addKeyword<Provider, IDBDatabase>(welcomeKeywords)
 
                 message += '\n📝 *Para reservar, responde con el número del horario que deseas*\n ℹ️*Para SOBRETURNOS LLAMAR AL 3735604949*';
                 // message += '\n🏥 Si necesitas un sobreturno, escribe *"sobreturnos"*';
-                message += '‼️EL DIA 16 y 17 DE FEBRERO NO ATIENDE‼️*\n\n';
+                // message += '‼️EL DIA 16 y 17 DE FEBRERO NO ATIENDE‼️*\n\n';
 
                 await flowDynamic(message);
             } else {
@@ -1509,9 +1510,9 @@ export const publicBookingLinkFlow = addKeyword(['bazinga', 'link', 'enlace'])
 const main = async () => {
     const adapterFlow = createFlow([
         // Flujos principales
-        sobreTurnosTemporario,  // DEBE estar primero para evitar conflicto con "turnos"
+        //sobreTurnosTemporario,  // DEBE estar primero para evitar conflicto con "turnos"
+        bookSobreturnoFlow,  // DEBE estar primero para evitar conflicto con "turnos" en welcomeFlow
         welcomeFlow,         // Se activa con saludos y muestra horarios automáticamente
-        //bookSobreturnoFlow,  // Se activa únicamente con la palabra "sobreturno"
         publicBookingLinkFlow, // Se activa con "bazinga", "link", "enlace"
         clientDataFlow,
         goodbyeFlow,
