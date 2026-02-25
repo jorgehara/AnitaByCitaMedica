@@ -1,6 +1,6 @@
 #!/bin/bash
 
-interval=180 # en segundos
+interval=600 # en segundos
 restart_count=0
 log_file="restart-server.log"
 
